@@ -1,0 +1,7 @@
+{"ts":"2026-03-05T08:12:11Z","service":"api-gateway","level":"ERROR","msg":"502 upstream connect error","request_id":"r1","user_id":"u_1032","ip":"10.1.2.3"}
+{"ts":"2026-03-05T08:12:14Z","service":"auth","level":"WARN","msg":"jwt validation failed, kid not found","request_id":"r2","user_id":"u_2031","ip":"10.1.2.9"}
+{"ts":"2026-03-05T08:12:25Z","service":"payments","level":"ERROR","msg":"db timeout after 3000ms","request_id":"r3","user_id":"u_4412","ip":"10.1.2.4"}
+{"ts":"2026-03-05T08:12:30Z","service":"api-gateway","level":"ERROR","msg":"502 upstream connect error","request_id":"r4","user_id":"u_1032","ip":"10.1.2.3"}
+{"ts":"2026-03-05T08:13:02Z","service":"db","level":"WARN","msg":"connections saturated, pool at 98%","request_id":"r5","user_id":"-","ip":"-"}
+{"ts":"2026-03-05T08:13:15Z","service":"auth","level":"ERROR","msg":"jwt validation failed, kid not found","request_id":"r6","user_id":"u_2031","ip":"10.1.2.9"}
+{"ts":"2026-03-05T08:13:45Z","service":"payments","level":"ERROR","msg":"db timeout after 3000ms","request_id":"r7","user_id":"u_4412","ip":"10.1.2.4"}
