@@ -3,6 +3,8 @@
 # retrieving the status of a run, and streaming real-time updates to the client.
 import asyncio
 import uuid
+import os
+import uuid
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,10 +23,19 @@ app = FastAPI()
 store = RunStore()
 orchestrator = SingleAgentOrchestrator()
 
+origins_env = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
+
+if not allowed_origins:
+    allowed_origins = [
+        "http://localhost:5173",
+        "https://main.dlvx8idi4h2r9.amplifyapp.com",
+    ]
+
 # CORS middleware is added to allow cross-origin requests from the React frontend, which will be hosted on a different domain or port.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later for Amplify
+    allow_origins=allowed_origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
