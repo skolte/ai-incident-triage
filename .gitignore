@@ -34,3 +34,8 @@ coverage/
 # Misc
 *.sqlite3
 *.db
+.ssh/
+id_ed25519*
+*.pem
+
+*.code-workspace

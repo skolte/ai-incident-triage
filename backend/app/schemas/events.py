@@ -90,5 +90,6 @@ EventType = Literal[
 class StreamEvent(BaseModel):
     type: EventType
     run_id: str
+    sequence: int | None = None
     agent: Optional[str] = None
     data: Dict[str, Any] = Field(default_factory=dict)

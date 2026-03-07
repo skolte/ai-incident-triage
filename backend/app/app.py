@@ -34,6 +34,10 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+    
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
 
 # The /api/triage endpoint is defined to start a new triage process. It generates a unique run_id, creates a new run in the RunStore, 
 # and starts the orchestrator in a background task to process the incident text.
@@ -41,7 +45,15 @@ async def health():
 async def start_triage(req: TriageRequest):
     run_id = str(uuid.uuid4())
     store.create_run(run_id, req.incident_text)
-    asyncio.create_task(orchestrator.run(run_id, req.incident_text, store))
+    
+    async def run_with_debug():
+        try:
+            await orchestrator.run(run_id, req.incident_text, store)
+        except Exception as e:
+            print(f"[ERROR] orchestrator failed for {run_id}: {e}")
+            raise
+
+    asyncio.create_task(run_with_debug())
     return TriageStartResponse(run_id=run_id)
 
 # The /api/triage/{run_id} endpoint allows clients to retrieve the current status and details of a specific run by its run_id.
