@@ -1891,6 +1891,20 @@ button, input, textarea, select { font: inherit; }
   padding: 0;
 }
 
+.lfe-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+}
+
+.lfe-loading-text {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  animation: fade-pulse 1.5s ease-in-out infinite;
+}
+
 .lfe-preview-lines {
   display: flex;
   flex-direction: column;
