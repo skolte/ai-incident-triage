@@ -39,9 +39,11 @@ export default function IncidentForm({ isRunning, onSubmit, compact = false, ini
 
   return (
     <section className="panel">
-      <div className="panel-header">
-        <h2>Incident Input</h2>
-      </div>
+      {compact && (
+        <div className="panel-header">
+          <h2>Incident Input</h2>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="form-stack">
         <label htmlFor="incidentText" className="label">

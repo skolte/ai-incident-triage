@@ -129,6 +129,22 @@ export default function App() {
               <span className="metric-value">{events.filter((e) => e.type === "tool_call").length}</span>
               <span className="metric-label">Tool Calls</span>
             </div>
+            {metrics && (
+              <div className="metric-item metric-item--cost">
+                <span className="metric-value metric-value--cost">
+                  {metrics.estimated_cost_usd < 0.001
+                    ? `$${metrics.estimated_cost_usd.toFixed(5)}`
+                    : `$${metrics.estimated_cost_usd.toFixed(4)}`}
+                </span>
+                <span className="metric-label">Run Cost</span>
+              </div>
+            )}
+            {metrics && (
+              <div className="metric-item">
+                <span className="metric-value">{metrics.total_tokens.toLocaleString()}</span>
+                <span className="metric-label">Tokens</span>
+              </div>
+            )}
             {runId && (
               <div className="metric-item metric-item--mono">
                 <span className="metric-value">{runId.slice(0, 8)}</span>
@@ -153,9 +169,8 @@ export default function App() {
             <div className="landing-badge">Live AI Demo</div>
             <h2 className="landing-title">Incident Triage, Automated</h2>
             <p className="landing-desc">
-              Submit an operational incident. Watch the AI agent search logs, consult runbooks,
-              run compliance checks — then produce a structured ticket in real time.
-              Every reasoning step streams to the UI as it happens.
+              The AI agent searches thousands of logs, consults runbooks, runs compliance checks —
+              then produces a structured ticket in real time. Every reasoning step streams to the UI as it happens.
             </p>
             <div className="landing-tech-row">
               {TECH_STACK.map((t) => (
@@ -164,41 +179,73 @@ export default function App() {
             </div>
           </div>
 
-          <LogFileExplorer />
-
-          <div className="landing-scenario-grid">
-            {SCENARIOS.map((s) => (
-              <button
-                key={s.id}
-                className="scenario-card"
-                onClick={() => handleStartTriage(s.desc)}
-                disabled={isRunning}
-                style={{ "--card-color": s.severityColor } as React.CSSProperties}
-              >
-                <div className="scenario-card-top">
-                  <span className="scenario-category">{s.category}</span>
-                  <span className="scenario-sev" style={{ color: s.severityColor }}>
-                    {s.severity}
-                  </span>
+          {/* Step 1 */}
+          <div className="landing-step">
+            <div className="landing-step-header">
+              <span className="landing-step-num">1</span>
+              <div>
+                <div className="landing-step-title">The Data Sources</div>
+                <div className="landing-step-desc">
+                  Logs and runbooks stored on the backend — the agent searches all of this in seconds
                 </div>
-                <h3 className="scenario-title">{s.title}</h3>
-                <p className="scenario-desc">{s.desc}</p>
-                <div className="scenario-tags">
-                  {s.tags.map((tag) => (
-                    <span key={tag} className="scenario-tag">{tag}</span>
-                  ))}
-                </div>
-                <span className="scenario-cta">Run this scenario →</span>
-              </button>
-            ))}
+              </div>
+            </div>
+            <LogFileExplorer />
           </div>
 
-          <div className="landing-divider">
-            <span>or describe your own incident</span>
+          {/* Step 2 */}
+          <div className="landing-step">
+            <div className="landing-step-header">
+              <span className="landing-step-num">2</span>
+              <div>
+                <div className="landing-step-title">Run a Scenario</div>
+                <div className="landing-step-desc">
+                  Click any card to start a live triage run — the agent reasons through logs, runbooks, and compliance checks in real time
+                </div>
+              </div>
+            </div>
+            <div className="landing-scenario-grid">
+              {SCENARIOS.map((s) => (
+                <button
+                  key={s.id}
+                  className="scenario-card"
+                  onClick={() => handleStartTriage(s.desc)}
+                  disabled={isRunning}
+                  style={{ "--card-color": s.severityColor } as React.CSSProperties}
+                >
+                  <div className="scenario-card-top">
+                    <span className="scenario-category">{s.category}</span>
+                    <span className="scenario-sev" style={{ color: s.severityColor }}>
+                      {s.severity}
+                    </span>
+                  </div>
+                  <h3 className="scenario-title">{s.title}</h3>
+                  <p className="scenario-desc">{s.desc}</p>
+                  <div className="scenario-tags">
+                    {s.tags.map((tag) => (
+                      <span key={tag} className="scenario-tag">{tag}</span>
+                    ))}
+                  </div>
+                  <span className="scenario-cta">▶ Run this scenario</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="landing-form-wrap">
-            <IncidentForm isRunning={isRunning} onSubmit={handleStartTriage} />
+          {/* Step 3 */}
+          <div className="landing-step">
+            <div className="landing-step-header">
+              <span className="landing-step-num">3</span>
+              <div>
+                <div className="landing-step-title">Or Describe Your Own Incident</div>
+                <div className="landing-step-desc">
+                  Type any operational issue — the agent will search the logs, consult runbooks, and produce a structured ticket
+                </div>
+              </div>
+            </div>
+            <div className="landing-form-wrap">
+              <IncidentForm isRunning={isRunning} onSubmit={handleStartTriage} />
+            </div>
           </div>
         </div>
       )}
