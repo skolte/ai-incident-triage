@@ -1650,6 +1650,176 @@ button, input, textarea, select { font: inherit; }
   font-size: 0.9rem;
 }
 
+/* =====================
+   Run History Panel
+   ===================== */
+
+.rh-wrap {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.rh-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--panel-border);
+  flex-wrap: wrap;
+}
+
+.rh-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rh-icon { font-size: 1.2rem; margin-top: 1px; }
+
+.rh-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rh-subtitle {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.rh-summary-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rh-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 6px 14px;
+  min-width: 72px;
+}
+
+.rh-pill-val {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.rh-pill-val--cost { color: var(--success); }
+
+.rh-pill-label {
+  font-size: 0.62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.rh-table-wrap {
+  overflow-x: auto;
+}
+
+.rh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.rh-table th {
+  padding: 8px 16px;
+  text-align: left;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+.rh-row {
+  border-bottom: 1px solid var(--panel-border);
+  transition: background 0.1s;
+}
+
+.rh-row:last-child { border-bottom: none; }
+.rh-row:hover { background: var(--bg); }
+
+.rh-cell {
+  padding: 10px 16px;
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.rh-cell--time {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.rh-cell--incident {
+  max-width: 280px;
+}
+
+.rh-incident-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rh-incident-ellipsis { color: var(--muted); }
+
+.rh-sev {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid currentColor;
+}
+
+.rh-cell--cost {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.rh-cell--mono {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.rh-cell--center { text-align: center; }
+
+.rh-ls-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rh-ls-link:hover { text-decoration: underline; }
+
+.rh-ls-none {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 /* Trace tool result line */
 .trace-summary--tool {
   color: var(--muted);

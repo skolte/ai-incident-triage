@@ -4,6 +4,7 @@ import LangSmithTrace from "./components/LangSmithTrace";
 import LogFileExplorer from "./components/LogFileExplorer";
 import ObservabilityPanel from "./components/ObservabilityPanel";
 import PipelineViz from "./components/PipelineViz";
+import RunHistoryPanel, { saveRunRecord } from "./components/RunHistoryPanel";
 import TicketViewer from "./components/TicketViewer";
 import TracePanel from "./components/TracePanel";
 
@@ -57,7 +58,8 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [appError, setAppError]   = useState<string | null>(null);
   const [metrics, setMetrics]     = useState<MetricsData | null>(null);
-  const [lastText, setLastText]   = useState<string>("");
+  const [lastText, setLastText]       = useState<string>("");
+  const [historyKey, setHistoryKey]   = useState(0);   // bumped to refresh RunHistoryPanel
 
   const cleanupRef = useRef<null | (() => void)>(null);
 
@@ -100,6 +102,25 @@ export default function App() {
             const t = event.data.ticket as IncidentTicket | undefined;
             if (t) setTicket(t);
             setIsRunning(false);
+            // Persist run summary for the observability history panel
+            setMetrics((m) => {
+              if (m) {
+                saveRunRecord({
+                  runId: result.run_id,
+                  timestamp: new Date().toISOString(),
+                  incidentText: incidentText,
+                  ticketTitle: t?.title,
+                  severity: t?.severity,
+                  cost: m.estimated_cost_usd,
+                  tokens: m.total_tokens,
+                  latencyMs: m.latency_ms,
+                  toolCount: m.tool_count,
+                  langsmithUrl: m.langsmith_url,
+                });
+                setHistoryKey((k) => k + 1);
+              }
+              return m;
+            });
           }
           if (event.type === "error") {
             setAppError(typeof event.data.message === "string" ? event.data.message : "Backend error");
@@ -200,6 +221,9 @@ export default function App() {
             </div>
           </div>
 
+          {/* Observability history — visible after first run */}
+          <RunHistoryPanel refreshKey={historyKey} />
+
           {/* Step 1 */}
           <div className="landing-step">
             <div className="landing-step-header">
@@ -290,10 +314,10 @@ export default function App() {
             {/* Center: trace */}
             <TracePanel runId={runId} events={events} isRunning={isRunning} />
 
-            {/* Right: ticket + obs + langsmith */}
+            {/* Right: obs + ticket + langsmith */}
             <div className="run-right">
-              <TicketViewer ticket={ticket} />
               <ObservabilityPanel metrics={metrics} />
+              <TicketViewer ticket={ticket} />
               <LangSmithTrace runId={runId} isRunning={isRunning} />
             </div>
           </main>
