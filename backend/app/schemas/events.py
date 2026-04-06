@@ -70,6 +70,7 @@
 #   }
 # }
 
+from datetime import datetime, timezone
 from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, Field
 
@@ -77,11 +78,13 @@ from pydantic import BaseModel, Field
 EventType = Literal[
     "run_started",
     "agent_started",
+    "status",
     "tool_call",
     "tool_result",
     "agent_completed",
     "handoff",
     "final_result",
+    "metrics",
     "error",
     "heartbeat",
 ]
@@ -92,4 +95,5 @@ class StreamEvent(BaseModel):
     run_id: str
     sequence: int | None = None
     agent: Optional[str] = None
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     data: Dict[str, Any] = Field(default_factory=dict)

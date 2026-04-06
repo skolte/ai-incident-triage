@@ -5,3 +5,4 @@ pydantic
 langgraph
 langchain
 langchain-openai
+langsmith

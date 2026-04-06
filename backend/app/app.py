@@ -5,6 +5,7 @@ import asyncio
 import uuid
 import os
 import uuid
+from langsmith import Client as LangSmithClient
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,7 @@ from app.schemas.api import TriageRequest, TriageStartResponse
 from app.schemas.events import StreamEvent
 
 load_dotenv()
+ls_client = LangSmithClient()
 
 # The FastAPI application is initialized, along with the RunStore for managing the state of runs and the SingleAgentOrchestrator for processing incidents with a single agent.
 app = FastAPI()
@@ -74,6 +76,42 @@ async def get_run(run_id: str):
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
+
+# The /api/triage/{run_id}/trace endpoint allows clients to retrieve the LangSmith trace for a specific run by its run_id.
+@app.get("/api/triage/{run_id}/trace")
+async def get_run_trace(run_id: str):
+    run = store.get_run(run_id)
+    if not run:    
+        raise HTTPException(status_code=404, detail="Run not found")
+    if run["langsmith_run_id"] is None:
+        raise HTTPException(status_code=404, detail="LangSmith trace not yet available")
+    else:        
+        runs = list(ls_client.list_runs(                                                                                                                                                          
+                                        project_name="ai-incident-triage",                    
+                                        trace_id=run["langsmith_run_id"],   # fetches ALL runs in that trace by langsmith_run_id,                                                                                                                                                           
+                                        select=["id", "name", "run_type", "status", "start_time", "end_time",                                                                                                              
+                                                "prompt_tokens", "completion_tokens", "inputs", "outputs", "error"] 
+                                    ))   
+        # The runs are returned as a dictionary keyed by run ID, containing details about each run in the trace.
+        # This allows the frontend to display the full trace of the triage process, including all steps taken by the orchestrator and agents.
+        runs_dict = {
+            str(r.id): {
+                "id": str(r.id),
+                "name": r.name,
+                "run_type": r.run_type,
+                "status": r.status,
+                "start_time": r.start_time.isoformat() if r.start_time else None,
+                "end_time": r.end_time.isoformat() if r.end_time else None,
+                "prompt_tokens": r.prompt_tokens,
+                "completion_tokens": r.completion_tokens,
+                "total_tokens": r.total_tokens,
+                "inputs": r.inputs,
+                "outputs": r.outputs,
+                "error": r.error,
+            }
+            for r in runs
+        }
+    return {"runs": runs_dict}
 
 # The /api/triage/stream/{run_id} endpoint provides a Server-Sent Events (SSE) stream for real-time updates about the progress of a specific run.
 # It retrieves the event queue for the run and yields events as they are emitted by the orchestrator and agents,

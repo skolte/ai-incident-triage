@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "docker": "^1.0.0"
+    "docker": "^1.0.0",
+    "dotenv": "^17.3.1"
   }
 }

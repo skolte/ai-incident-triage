@@ -1,8 +1,13 @@
+import asyncio
 import json
+import os
+import time
 from typing import Optional
 
 from langchain_core.tools import tool
+from langchain_core.tracers.context import collect_runs
 from langchain_openai import ChatOpenAI
+from langsmith import Client as LangSmithClient
 from langgraph.prebuilt import create_react_agent
 
 from app.agents.base_agent import BaseAgent
@@ -47,12 +52,48 @@ IncidentTicket schema:
 }
 """
 
+# gpt-4o-mini pricing (per token)
+_INPUT_COST_PER_TOKEN  = 0.000_000_150   # $0.150 / 1M
+_OUTPUT_COST_PER_TOKEN = 0.000_000_600   # $0.600 / 1M
+
+
+def _extract_token_usage(messages: list) -> dict:
+    """
+    Sum token counts across all AI messages in the result.
+    Handles both usage_metadata (langchain-core >= 0.2) and
+    response_metadata["token_usage"] (older langchain-openai style).
+    """
+    prompt_tokens = 0
+    completion_tokens = 0
+
+    for msg in messages:
+        # Newer API: usage_metadata attribute
+        usage_meta = getattr(msg, "usage_metadata", None)
+        if usage_meta:
+            prompt_tokens     += usage_meta.get("input_tokens", 0)
+            completion_tokens += usage_meta.get("output_tokens", 0)
+            continue
+
+        # Older API: response_metadata["token_usage"]
+        resp_meta = getattr(msg, "response_metadata", {}) or {}
+        tu = resp_meta.get("token_usage", {})
+        if tu:
+            prompt_tokens     += tu.get("prompt_tokens", 0)
+            completion_tokens += tu.get("completion_tokens", 0)
+
+    return {
+        "prompt_tokens":     prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens":      prompt_tokens + completion_tokens,
+    }
+
 
 class TriageAgent(BaseAgent):
     name = "TriageAgent"
 
     async def run(self, state: AgentState, store: RunStore) -> AgentState:
         print("TriageAgent: started")
+        run_start = time.monotonic()
 
         await store.emit(
             StreamEvent(
@@ -63,7 +104,12 @@ class TriageAgent(BaseAgent):
             )
         )
 
+        tool_durations: list[dict] = []
+        # Use a list as a mutable closure variable (stack for nested safety)
+        _tool_timer: list[float] = []
+
         def emit_tool_call(tool_name: str, args: dict) -> None:
+            _tool_timer.append(time.monotonic())
             store.emit_sync(
                 StreamEvent(
                     type="tool_call",
@@ -74,6 +120,8 @@ class TriageAgent(BaseAgent):
             )
 
         def emit_tool_result(tool_name: str, result: str) -> None:
+            duration_ms = int((time.monotonic() - _tool_timer.pop()) * 1000) if _tool_timer else 0
+            tool_durations.append({"tool": tool_name, "duration_ms": duration_ms})
             store.emit_sync(
                 StreamEvent(
                     type="tool_result",
@@ -82,6 +130,7 @@ class TriageAgent(BaseAgent):
                     data={
                         "tool": tool_name,
                         "result_preview": result[:500],
+                        "duration_ms": duration_ms,
                     },
                 )
             )
@@ -93,18 +142,10 @@ class TriageAgent(BaseAgent):
             level: Optional[str] = None,
         ) -> str:
             """Search incident logs by service name, message substring, and/or log level."""
-            args = {
-                "service": service,
-                "contains": contains,
-                "level": level,
-            }
+            args = {"service": service, "contains": contains, "level": level}
             print("TriageAgent: log_search called", args)
             emit_tool_call("log_search", args)
-            result = log_search_impl(
-                service=service,
-                contains=contains,
-                level=level,
-            )
+            result = log_search_impl(service=service, contains=contains, level=level)
             emit_tool_result("log_search", result)
             return result
 
@@ -136,9 +177,13 @@ class TriageAgent(BaseAgent):
             return result
 
         print("TriageAgent: creating ChatOpenAI")
+        await store.emit(StreamEvent(type="status", run_id=state.run_id, agent=self.name,
+                                     data={"message": "Creating AI model (gpt-4o-mini)"}))
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
         print("TriageAgent: creating LangGraph agent")
+        await store.emit(StreamEvent(type="status", run_id=state.run_id, agent=self.name,
+                                     data={"message": "Building LangGraph ReAct agent with tools"}))
         agent = create_react_agent(
             llm,
             [log_search, list_runbooks, read_runbook, policy_check],
@@ -146,7 +191,40 @@ class TriageAgent(BaseAgent):
         )
 
         print("TriageAgent: invoking agent")
-        result = agent.invoke({"messages": [("user", state.incident_text)]})
+        await store.emit(StreamEvent(type="status", run_id=state.run_id, agent=self.name,
+                                     data={"message": "Invoking agent — reasoning in progress"}))
+        # collect_runs() is a LangChain context manager that captures the IDs of
+        # any LangSmith traces created inside the block. This lets us retrieve the
+        # trace URL afterwards and surface it in the UI.
+        langsmith_url: str | None = None
+        loop = asyncio.get_running_loop()
+        with collect_runs() as cb:
+            result = await loop.run_in_executor(
+                None,
+                lambda: agent.invoke(
+                    {"messages": [("user", state.incident_text)]},
+                    config={
+                        "run_name": "TriageAgent",
+                        "tags": ["incident-triage"],
+                        "metadata": {
+                            "run_id": state.run_id,
+                            "incident_preview": state.incident_text[:200],
+                        },
+                    },
+                ),
+            )
+
+        # After invoke completes, try to fetch the LangSmith trace URL.
+        # Only attempted when tracing is enabled; failures are non-fatal.
+        if cb.traced_runs and os.getenv("LANGCHAIN_TRACING_V2") == "true":
+            try:
+                ls_client = LangSmithClient()
+                ls_run = ls_client.read_run(str(cb.traced_runs[0]))
+                langsmith_url = ls_run.url
+                store.set_langsmith_run_id(state.run_id, str(ls_run.id))
+                print(f"TriageAgent: LangSmith trace → {langsmith_url}")
+            except Exception as ls_err:
+                print(f"TriageAgent: could not fetch LangSmith URL: {ls_err}")
 
         messages = result.get("messages", [])
         if not messages:
@@ -181,6 +259,33 @@ class TriageAgent(BaseAgent):
                 run_id=state.run_id,
                 agent=self.name,
                 data={"message": "Triage completed"},
+            )
+        )
+
+        # --- Observability metrics ---
+        token_usage = _extract_token_usage(messages)
+        estimated_cost = round(
+            token_usage["prompt_tokens"]     * _INPUT_COST_PER_TOKEN +
+            token_usage["completion_tokens"] * _OUTPUT_COST_PER_TOKEN,
+            6,
+        )
+        total_latency_ms = int((time.monotonic() - run_start) * 1000)
+
+        await store.emit(
+            StreamEvent(
+                type="metrics",
+                run_id=state.run_id,
+                agent=self.name,
+                data={
+                    "prompt_tokens":     token_usage["prompt_tokens"],
+                    "completion_tokens": token_usage["completion_tokens"],
+                    "total_tokens":      token_usage["total_tokens"],
+                    "estimated_cost_usd": estimated_cost,
+                    "latency_ms":        total_latency_ms,
+                    "tool_count":        len(tool_durations),
+                    "tool_durations":    tool_durations,
+                    "langsmith_url":     langsmith_url,
+                },
             )
         )
 

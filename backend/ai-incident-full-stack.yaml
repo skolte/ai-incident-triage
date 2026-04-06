@@ -14,6 +14,11 @@ Parameters:
     Type: String
     NoEcho: true
 
+  AllowedOrigins:
+    Type: String
+    Default: "http://localhost:5173,https://main.dlvx8idi4h2r9.amplifyapp.com"
+    Description: Comma-separated list of allowed CORS origins
+
   ContainerPort:
     Type: Number
     Default: 8000
@@ -235,6 +240,8 @@ Resources:
           Environment:
             - Name: OPENAI_API_KEY
               Value: !Ref OpenAIAPIKey
+            - Name: ALLOWED_ORIGINS
+              Value: !Ref AllowedOrigins
           LogConfiguration:
             LogDriver: awslogs
             Options:

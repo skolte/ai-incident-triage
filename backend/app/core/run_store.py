@@ -10,7 +10,7 @@ class RunStore:
         self.queues: Dict[str, asyncio.Queue] = {}
         self.loop: Optional[asyncio.AbstractEventLoop] = None
 
-    def create_run(self, run_id: str, incident_text: str) -> None:        
+    def create_run(self, run_id: str, incident_text: str) -> None:         
         if self.loop is None:
             try:
                 self.loop = asyncio.get_running_loop()
@@ -18,6 +18,7 @@ class RunStore:
                 self.loop = None
 
         self.runs[run_id] = {
+            "langsmith_run_id": None,
             "sequence_counter": 0,
             "status": "running",
             "incident_text": incident_text,
@@ -55,6 +56,10 @@ class RunStore:
             return
         self.runs[run_id]["status"] = "completed"
         self.runs[run_id]["final_result"] = final_result
+    
+    def set_langsmith_run_id(self, run_id: str, langsmith_run_id: str) -> None:
+        if run_id in self.runs:
+            self.runs[run_id]["langsmith_run_id"] = langsmith_run_id
 
     async def close_stream(self, run_id: str) -> None:
         if run_id in self.queues:
