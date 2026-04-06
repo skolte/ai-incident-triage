@@ -33,12 +33,48 @@ const TECH_CATEGORIES = [
   {
     label: "Infrastructure",
     items: [
-      { name: "AWS ECS Fargate", desc: "Serverless containers" },
+      { name: "AWS ECS Fargate", desc: "Serverless container compute" },
       { name: "AWS Amplify", desc: "Frontend CI/CD & hosting" },
       { name: "CloudFront", desc: "CDN & HTTPS termination" },
-      { name: "CloudFormation", desc: "Infrastructure as code" },
+      { name: "CloudFormation", desc: "Infrastructure as code (IaC)" },
+      { name: "Amazon ECR", desc: "Docker image registry" },
+      { name: "Amazon VPC", desc: "Isolated network with public subnets" },
+      { name: "ALB", desc: "Application Load Balancer with health checks" },
+      { name: "CloudWatch", desc: "Container logging & monitoring" },
     ],
   },
+];
+
+const AWS_RESOURCES = [
+  { category: "Networking", items: [
+    { name: "VPC", detail: "10.20.0.0/16 CIDR, DNS enabled" },
+    { name: "Internet Gateway", detail: "Public internet access for subnets" },
+    { name: "Public Subnet A", detail: "10.20.1.0/24, AZ-a, auto-assign public IP" },
+    { name: "Public Subnet B", detail: "10.20.2.0/24, AZ-b, auto-assign public IP" },
+    { name: "Route Table", detail: "Default route 0.0.0.0/0 via IGW" },
+  ]},
+  { category: "Security", items: [
+    { name: "ALB Security Group", detail: "Allows inbound TCP:80 from anywhere" },
+    { name: "ECS Security Group", detail: "Allows inbound from ALB SG only on port 8000" },
+    { name: "IAM Execution Role", detail: "ECS task execution + ECR pull + CloudWatch write" },
+  ]},
+  { category: "Load Balancing", items: [
+    { name: "Application Load Balancer", detail: "Internet-facing, 300s idle timeout" },
+    { name: "Target Group", detail: "IP target type, health check on /healthz (HTTP 200)" },
+    { name: "HTTP Listener", detail: "Port 80, forwards to target group" },
+  ]},
+  { category: "Compute", items: [
+    { name: "ECS Cluster", detail: "ai-incident-cluster" },
+    { name: "Task Definition", detail: "Fargate, 512 CPU / 1024 MB, x86_64 Linux" },
+    { name: "ECS Service", detail: "Desired count 1, 60s health check grace period" },
+  ]},
+  { category: "Observability", items: [
+    { name: "CloudWatch Log Group", detail: "/ecs/ai-incident, 14-day retention" },
+  ]},
+  { category: "Frontend", items: [
+    { name: "AWS Amplify", detail: "CI/CD build from repo, publishes frontend/dist" },
+    { name: "Amazon CloudFront", detail: "CDN distribution with HTTPS for Amplify app" },
+  ]},
 ];
 
 const TOOLS = [
@@ -340,6 +376,40 @@ export default function ArchitecturePanel() {
         </div>
       </section>
 
+      {/* ── Section: AWS Infrastructure ─────────────────────── */}
+      <section className="arch-section">
+        <div className="arch-section-header">
+          <span className="arch-section-icon">&#9729;</span>
+          <div>
+            <h3 className="arch-section-title">AWS Infrastructure (CloudFormation)</h3>
+            <p className="arch-section-desc">
+              19 resources deployed via <code>ai-incident-full-stack.yaml</code> — full IaC template
+            </p>
+          </div>
+        </div>
+
+        <div className="arch-aws-grid">
+          {AWS_RESOURCES.map((group) => (
+            <div key={group.category} className="arch-aws-group">
+              <div className="arch-aws-cat">{group.category}</div>
+              {group.items.map((r) => (
+                <div key={r.name} className="arch-aws-item">
+                  <div className="arch-aws-name">{r.name}</div>
+                  <div className="arch-aws-detail">{r.detail}</div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <div className="arch-sse-flow" style={{ marginTop: 16 }}>
+          <span className="arch-sse-flow-label">Deployment flow:</span>
+          <code className="arch-sse-flow-code">
+            Docker build &rarr; ECR push &rarr; CloudFormation deploy &rarr; ECS Fargate runs container &rarr; ALB routes traffic
+          </code>
+        </div>
+      </section>
+
       {/* ── Section: Backend Layer Map ───────────────────────── */}
       <section className="arch-section">
         <div className="arch-section-header">
@@ -374,6 +444,75 @@ export default function ArchitecturePanel() {
   data/
     logs.jsonl                      sample operational logs
     runbooks/                       remediation guides (.md)`}</pre>
+        </div>
+      </section>
+
+      {/* ── Section: API Documentation ───────────────────────── */}
+      <section className="arch-section">
+        <div className="arch-section-header">
+          <span className="arch-section-icon">&#128214;</span>
+          <div>
+            <h3 className="arch-section-title">API Documentation</h3>
+            <p className="arch-section-desc">REST endpoints exposed by the FastAPI backend</p>
+          </div>
+        </div>
+
+        <div className="arch-api-table">
+          <div className="arch-api-row arch-api-row--header">
+            <span className="arch-api-method">Method</span>
+            <span className="arch-api-path">Path</span>
+            <span className="arch-api-desc">Description</span>
+          </div>
+          {[
+            { method: "POST", path: "/api/triage", desc: "Start a triage run. Returns { run_id }." },
+            { method: "GET", path: "/api/triage/stream/{run_id}", desc: "SSE stream of all run events in real time." },
+            { method: "GET", path: "/api/triage/{run_id}", desc: "Full run state: status, events, final result." },
+            { method: "GET", path: "/api/triage/{run_id}/trace", desc: "LangSmith trace data for the run." },
+            { method: "GET", path: "/health", desc: "Async health check endpoint." },
+            { method: "GET", path: "/healthz", desc: "Sync health check (used by ALB target group)." },
+          ].map((ep) => (
+            <div key={ep.path} className="arch-api-row">
+              <span className={`arch-api-method arch-api-method--${ep.method.toLowerCase()}`}>{ep.method}</span>
+              <code className="arch-api-path">{ep.path}</code>
+              <span className="arch-api-desc">{ep.desc}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Section: Environment & Configuration ─────────────── */}
+      <section className="arch-section">
+        <div className="arch-section-header">
+          <span className="arch-section-icon">&#9881;</span>
+          <div>
+            <h3 className="arch-section-title">Environment & Configuration</h3>
+            <p className="arch-section-desc">Required environment variables and runtime configuration</p>
+          </div>
+        </div>
+
+        <div className="arch-env-grid">
+          <div className="arch-env-group">
+            <div className="arch-aws-cat">Backend (.env)</div>
+            {[
+              { name: "OPENAI_API_KEY", desc: "OpenAI API key for gpt-4o-mini" },
+              { name: "ALLOWED_ORIGINS", desc: "Comma-separated CORS origins" },
+              { name: "LANGCHAIN_TRACING_V2", desc: "Enable LangSmith tracing (optional)" },
+              { name: "LANGCHAIN_API_KEY", desc: "LangSmith API key (optional)" },
+              { name: "LANGCHAIN_PROJECT", desc: "LangSmith project name" },
+            ].map((v) => (
+              <div key={v.name} className="arch-aws-item">
+                <code className="arch-aws-name">{v.name}</code>
+                <div className="arch-aws-detail">{v.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div className="arch-env-group">
+            <div className="arch-aws-cat">Frontend (.env)</div>
+            <div className="arch-aws-item">
+              <code className="arch-aws-name">VITE_API_BASE_URL</code>
+              <div className="arch-aws-detail">Backend API URL (e.g. http://localhost:8000)</div>
+            </div>
+          </div>
         </div>
       </section>
     </div>

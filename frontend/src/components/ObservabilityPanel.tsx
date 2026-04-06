@@ -75,7 +75,20 @@ function ToolDurationList({ durations }: { durations: Array<{ tool: string; dura
 }
 
 export default function ObservabilityPanel({ metrics }: ObservabilityPanelProps) {
-  if (!metrics) return null;
+  if (!metrics) {
+    return (
+      <div className="obs-panel obs-panel--waiting">
+        <div className="obs-header">
+          <span className="obs-title">Observability</span>
+          <span className="obs-model">gpt-4o-mini</span>
+        </div>
+        <div className="obs-waiting">
+          <span className="obs-waiting-dot" />
+          Waiting for metrics...
+        </div>
+      </div>
+    );
+  }
 
   const avgToolMs =
     metrics.tool_durations.length > 0

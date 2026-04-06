@@ -325,21 +325,27 @@ frontend/src/
 
 ## AWS Infrastructure
 
-Defined in `backend/ai-incident-full-stack.yaml` (CloudFormation):
+Defined in `backend/ai-incident-full-stack.yaml` (CloudFormation). **19 resources total**, parameterized with `ContainerImage`, `OpenAIAPIKey`, `AllowedOrigins`, `ContainerPort` (default 8000), `Cpu` (default 512), `Memory` (default 1024), `DesiredCount` (default 1).
 
 | Component | Role |
 |---|---|
-| VPC + Subnets | Isolated network for all resources |
-| Security Groups | ALB allows :80 inbound; ECS tasks allow from ALB only |
-| Application Load Balancer | Public entry point, routes to Target Group |
-| Target Group | Health-checked ECS task targets |
-| ECS Cluster | Logical container grouping |
-| ECS Task Definition | Container config: image, CPU, memory, env vars, ports |
-| ECS Service | Maintains desired task count, auto-restarts failed tasks |
+| VPC (10.20.0.0/16) | Isolated network with DNS support enabled |
+| Internet Gateway | Public internet access for VPC subnets |
+| Public Subnet A (10.20.1.0/24) | AZ-a, auto-assign public IP |
+| Public Subnet B (10.20.2.0/24) | AZ-b, auto-assign public IP |
+| Route Table + Default Route | 0.0.0.0/0 → Internet Gateway |
+| ALB Security Group | Allows inbound TCP:80 from 0.0.0.0/0 |
+| ECS Security Group | Allows inbound from ALB SG only on container port |
+| Application Load Balancer | Internet-facing, 300s idle timeout |
+| Target Group | IP target type, health check on `/healthz` (HTTP 200), 10s interval |
+| HTTP Listener | Port 80, forwards to Target Group |
+| ECS Cluster | `ai-incident-cluster` |
+| ECS Task Definition | Fargate, 512 CPU / 1024 MB, x86_64 Linux, awsvpc networking |
+| ECS Service | Desired count 1, 60s health check grace period, public IP enabled |
 | AWS Fargate | Serverless compute (no EC2 management) |
+| IAM Execution Role | ECS task execution + ECR pull + CloudWatch write |
+| CloudWatch Log Group | `/ecs/ai-incident`, 14-day retention |
 | Amazon ECR | Docker image registry |
-| IAM Task Role | ECS → CloudWatch, ECR permissions |
-| CloudWatch Log Group | Container stdout/stderr logs |
 | AWS Amplify | Frontend hosting (build from `amplify.yml`) |
 | CloudFront | HTTPS + CDN for Amplify frontend |
 

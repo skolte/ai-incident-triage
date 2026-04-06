@@ -706,6 +706,27 @@ button, input, textarea, select { font: inherit; }
   animation: slide-in 0.25s ease-out both;
 }
 
+.obs-panel--waiting {
+  border-style: dashed;
+}
+
+.obs-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding: 12px 0 4px;
+}
+
+.obs-waiting-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-dot 1.5s ease-out infinite;
+}
+
 .obs-header {
   display: flex;
   align-items: center;
@@ -2126,6 +2147,118 @@ button, input, textarea, select { font: inherit; }
   font-size: 0.76rem;
   color: var(--muted);
   line-height: 1.6;
+}
+
+/* AWS Infrastructure grid */
+
+.arch-aws-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.arch-aws-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.arch-aws-cat {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 2px;
+}
+
+.arch-aws-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.arch-aws-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.arch-aws-detail {
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* API Documentation table */
+
+.arch-api-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.arch-api-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 1.4fr;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.arch-api-row--header {
+  background: transparent;
+  border: none;
+  padding-bottom: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.arch-api-method {
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.arch-api-method--post { color: var(--event-tool-call); }
+.arch-api-method--get  { color: var(--event-tool-result); }
+
+.arch-api-row .arch-api-path {
+  font-size: 0.76rem;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--text);
+}
+
+.arch-api-row .arch-api-desc {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+/* Environment grid */
+
+.arch-env-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.arch-env-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* Cost metric in header */

@@ -226,6 +226,9 @@ export default function App() {
             </div>
           </div>
 
+          {/* Observability history — always visible above tabs */}
+          <RunHistoryPanel refreshKey={historyKey} />
+
           {/* Tab switcher */}
           <div className="landing-tabs">
             <button
@@ -245,9 +248,6 @@ export default function App() {
           {/* Demo tab content */}
           {landingTab === "demo" && (
             <>
-              {/* Observability history — visible after first run */}
-              <RunHistoryPanel refreshKey={historyKey} />
-
               {/* Step 1 */}
               <div className="landing-step">
                 <div className="landing-step-header">
