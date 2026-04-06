@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import ArchitecturePanel from "./components/ArchitecturePanel";
 import IncidentForm from "./components/IncidentForm";
 import LangSmithTrace from "./components/LangSmithTrace";
 import LogFileExplorer from "./components/LogFileExplorer";
@@ -60,6 +61,7 @@ export default function App() {
   const [metrics, setMetrics]     = useState<MetricsData | null>(null);
   const [lastText, setLastText]       = useState<string>("");
   const [historyKey, setHistoryKey]   = useState(0);   // bumped to refresh RunHistoryPanel
+  const [landingTab, setLandingTab]   = useState<"demo" | "architecture">("demo");
 
   const cleanupRef  = useRef<null | (() => void)>(null);
   const metricsRef  = useRef<MetricsData | null>(null);   // always-current metrics for saveRunRecord
@@ -224,77 +226,101 @@ export default function App() {
             </div>
           </div>
 
-          {/* Observability history — visible after first run */}
-          <RunHistoryPanel refreshKey={historyKey} />
-
-          {/* Step 1 */}
-          <div className="landing-step">
-            <div className="landing-step-header">
-              <span className="landing-step-num">1</span>
-              <div>
-                <div className="landing-step-title">The Data Sources</div>
-                <div className="landing-step-desc">
-                  Logs and runbooks stored on the backend — the agent searches all of this in seconds
-                </div>
-              </div>
-            </div>
-            <LogFileExplorer />
+          {/* Tab switcher */}
+          <div className="landing-tabs">
+            <button
+              className={`landing-tab ${landingTab === "demo" ? "landing-tab--active" : ""}`}
+              onClick={() => setLandingTab("demo")}
+            >
+              <span className="landing-tab-icon">&#9654;</span> Live Demo
+            </button>
+            <button
+              className={`landing-tab ${landingTab === "architecture" ? "landing-tab--active" : ""}`}
+              onClick={() => setLandingTab("architecture")}
+            >
+              <span className="landing-tab-icon">&#9783;</span> Architecture
+            </button>
           </div>
 
-          {/* Step 2 */}
-          <div className="landing-step">
-            <div className="landing-step-header">
-              <span className="landing-step-num">2</span>
-              <div>
-                <div className="landing-step-title">Run a Scenario</div>
-                <div className="landing-step-desc">
-                  Click any card to start a live triage run — the agent reasons through logs, runbooks, and compliance checks in real time
-                </div>
-              </div>
-            </div>
-            <div className="landing-scenario-grid">
-              {SCENARIOS.map((s) => (
-                <button
-                  key={s.id}
-                  className="scenario-card"
-                  onClick={() => handleStartTriage(s.desc)}
-                  disabled={isRunning}
-                  style={{ "--card-color": s.severityColor } as React.CSSProperties}
-                >
-                  <div className="scenario-card-top">
-                    <span className="scenario-category">{s.category}</span>
-                    <span className="scenario-sev" style={{ color: s.severityColor }}>
-                      {s.severity}
-                    </span>
+          {/* Demo tab content */}
+          {landingTab === "demo" && (
+            <>
+              {/* Observability history — visible after first run */}
+              <RunHistoryPanel refreshKey={historyKey} />
+
+              {/* Step 1 */}
+              <div className="landing-step">
+                <div className="landing-step-header">
+                  <span className="landing-step-num">1</span>
+                  <div>
+                    <div className="landing-step-title">The Data Sources</div>
+                    <div className="landing-step-desc">
+                      Logs and runbooks stored on the backend — the agent searches all of this in seconds
+                    </div>
                   </div>
-                  <h3 className="scenario-title">{s.title}</h3>
-                  <p className="scenario-desc">{s.desc}</p>
-                  <div className="scenario-tags">
-                    {s.tags.map((tag) => (
-                      <span key={tag} className="scenario-tag">{tag}</span>
-                    ))}
-                  </div>
-                  <span className="scenario-cta">▶ Run this scenario</span>
-                </button>
-              ))}
-            </div>
-          </div>
+                </div>
+                <LogFileExplorer />
+              </div>
 
-          {/* Step 3 */}
-          <div className="landing-step">
-            <div className="landing-step-header">
-              <span className="landing-step-num">3</span>
-              <div>
-                <div className="landing-step-title">Or Describe Your Own Incident</div>
-                <div className="landing-step-desc">
-                  Type any operational issue — the agent will search the logs, consult runbooks, and produce a structured ticket
+              {/* Step 2 */}
+              <div className="landing-step">
+                <div className="landing-step-header">
+                  <span className="landing-step-num">2</span>
+                  <div>
+                    <div className="landing-step-title">Run a Scenario</div>
+                    <div className="landing-step-desc">
+                      Click any card to start a live triage run — the agent reasons through logs, runbooks, and compliance checks in real time
+                    </div>
+                  </div>
+                </div>
+                <div className="landing-scenario-grid">
+                  {SCENARIOS.map((s) => (
+                    <button
+                      key={s.id}
+                      className="scenario-card"
+                      onClick={() => handleStartTriage(s.desc)}
+                      disabled={isRunning}
+                      style={{ "--card-color": s.severityColor } as React.CSSProperties}
+                    >
+                      <div className="scenario-card-top">
+                        <span className="scenario-category">{s.category}</span>
+                        <span className="scenario-sev" style={{ color: s.severityColor }}>
+                          {s.severity}
+                        </span>
+                      </div>
+                      <h3 className="scenario-title">{s.title}</h3>
+                      <p className="scenario-desc">{s.desc}</p>
+                      <div className="scenario-tags">
+                        {s.tags.map((tag) => (
+                          <span key={tag} className="scenario-tag">{tag}</span>
+                        ))}
+                      </div>
+                      <span className="scenario-cta">▶ Run this scenario</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-            <div className="landing-form-wrap">
-              <IncidentForm isRunning={isRunning} onSubmit={handleStartTriage} />
-            </div>
-          </div>
+
+              {/* Step 3 */}
+              <div className="landing-step">
+                <div className="landing-step-header">
+                  <span className="landing-step-num">3</span>
+                  <div>
+                    <div className="landing-step-title">Or Describe Your Own Incident</div>
+                    <div className="landing-step-desc">
+                      Type any operational issue — the agent will search the logs, consult runbooks, and produce a structured ticket
+                    </div>
+                  </div>
+                </div>
+                <div className="landing-form-wrap">
+                  <IncidentForm isRunning={isRunning} onSubmit={handleStartTriage} />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Architecture tab content */}
+          {landingTab === "architecture" && <ArchitecturePanel />}
         </div>
       )}
 

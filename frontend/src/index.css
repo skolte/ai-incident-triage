@@ -1643,6 +1643,491 @@ button, input, textarea, select { font: inherit; }
   line-height: 1.5;
 }
 
+/* =====================
+   Landing Tabs
+   ===================== */
+
+.landing-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 4px;
+  max-width: 340px;
+  margin: 0 auto;
+}
+
+.landing-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: -0.01em;
+}
+
+.landing-tab:hover:not(.landing-tab--active) {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.landing-tab--active {
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.landing-tab-icon {
+  font-size: 0.78rem;
+}
+
+/* =====================
+   Architecture Panel
+   ===================== */
+
+.arch {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: slide-in 0.2s ease-out both;
+}
+
+.arch-section {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 24px 28px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.arch-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.arch-section-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #93c5fd;
+  border-radius: 10px;
+  margin-top: 1px;
+}
+
+.arch-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.arch-section-desc {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Architecture Diagram */
+
+.arch-diagram {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.arch-diagram-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.arch-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  transition: border-color 0.2s;
+}
+
+.arch-node:hover {
+  border-color: var(--accent);
+}
+
+.arch-node-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.arch-node--agent .arch-node-icon {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  border-color: #a78bfa;
+}
+
+.arch-node--api .arch-node-icon {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #f59e0b;
+}
+
+.arch-node--orch .arch-node-icon {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-color: #60a5fa;
+}
+
+.arch-node--user .arch-node-icon {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #4ade80;
+}
+
+.arch-node--infra .arch-node-icon {
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%);
+  border-color: #fb7185;
+}
+
+.arch-node-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.arch-node-sub {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.arch-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  position: relative;
+}
+
+.arch-arrow::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--panel-border);
+  z-index: 0;
+}
+
+/* Tools column */
+
+.arch-diagram-col--tools {
+  gap: 10px;
+}
+
+.arch-tools-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.arch-tool-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid;
+  background: var(--bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.arch-tool-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.arch-tool-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.arch-tool-args {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  margin-left: 4px;
+}
+
+.arch-tool-desc {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Workflow steps */
+
+.arch-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.arch-wf-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.arch-wf-step:last-child {
+  padding-bottom: 0;
+}
+
+.arch-wf-num {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
+}
+
+.arch-wf-connector {
+  position: absolute;
+  left: 14px;
+  top: 30px;
+  bottom: 0;
+  width: 2px;
+  background: var(--panel-border);
+}
+
+.arch-wf-body {
+  flex: 1;
+  padding-top: 3px;
+}
+
+.arch-wf-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.arch-wf-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: 3px;
+}
+
+/* SSE events grid */
+
+.arch-sse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.arch-sse-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.arch-sse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.arch-sse-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.arch-sse-emitter {
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.arch-sse-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.arch-sse-flow-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.arch-sse-flow-code {
+  font-size: 0.72rem;
+  color: var(--text);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* Tech stack grid */
+
+.arch-tech-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.arch-tech-category {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arch-tech-cat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--accent);
+}
+
+.arch-tech-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.arch-tech-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.arch-tech-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.arch-tech-desc {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* Schema & code blocks */
+
+.arch-schema {
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: auto;
+}
+
+.arch-schema-code {
+  margin: 0;
+  padding: 18px 20px;
+  font-size: 0.78rem;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre;
+}
+
+/* Design decisions */
+
+.arch-decisions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.arch-decision {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--accent);
+}
+
+.arch-decision-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.arch-decision-detail {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 /* Cost metric in header */
 .metric-item--cost .metric-value--cost {
   color: var(--success);
@@ -2277,4 +2762,8 @@ button, input, textarea, select { font: inherit; }
   .landing-title { font-size: 1.7rem; }
   .pv-strip { gap: 6px; }
   .pv-connector { min-width: 12px; }
+  .arch-diagram { grid-template-columns: 1fr; }
+  .arch-tech-grid { grid-template-columns: 1fr; }
+  .arch-section { padding: 18px 16px; }
+  .arch-sse-flow { flex-direction: column; align-items: flex-start; }
 }
