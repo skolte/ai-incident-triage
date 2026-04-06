@@ -61,6 +61,19 @@ export default function App() {
 
   const cleanupRef = useRef<null | (() => void)>(null);
 
+  function handleGoHome() {
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    setRunId(null);
+    setEvents([]);
+    setTicket(null);
+    setMetrics(null);
+    setAppError(null);
+    setIsRunning(false);
+  }
+
   async function handleStartTriage(incidentText: string) {
     setAppError(null);
     setIsRunning(true);
@@ -117,6 +130,14 @@ export default function App() {
 
         {!isLanding && (
           <div className="header-metrics">
+            <button
+              className="back-home-btn"
+              onClick={handleGoHome}
+              disabled={isRunning}
+              title="Back to main screen"
+            >
+              ← New Triage
+            </button>
             <div className="metric-pill">
               <span className={`status-dot ${isRunning ? "status-dot--running" : "status-dot--idle"}`} />
               <span>{isRunning ? "Running" : "Done"}</span>

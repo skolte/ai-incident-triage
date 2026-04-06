@@ -46,12 +46,44 @@ function buildTraceItems(events: StreamEvent[]): TraceItem[] {
 }
 
 const SIMPLE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
-  run_started:     { icon: "▶", label: "Run Started",     color: "var(--event-run)"     },
-  agent_started:   { icon: "◆", label: "Agent Started",   color: "var(--event-agent)"   },
-  agent_completed: { icon: "◆", label: "Agent Completed", color: "var(--event-agent)"   },
-  final_result:    { icon: "★", label: "Ticket Generated",color: "var(--event-final)"   },
-  error:           { icon: "✕", label: "Error",           color: "var(--event-error)"   },
-  handoff:         { icon: "⇒", label: "Handoff",         color: "var(--event-handoff)" },
+  run_started:     { icon: "▶", label: "Triage Started",         color: "var(--event-run)"     },
+  agent_started:   { icon: "◆", label: "AI Agent Activated",     color: "var(--event-agent)"   },
+  agent_completed: { icon: "◆", label: "AI Agent Finished",      color: "var(--event-agent)"   },
+  final_result:    { icon: "★", label: "Ticket Ready",           color: "var(--event-final)"   },
+  error:           { icon: "✕", label: "Error",                  color: "var(--event-error)"   },
+  handoff:         { icon: "⇒", label: "Handed off to agent",    color: "var(--event-handoff)" },
+};
+
+// Human-readable descriptions for each tool the agent can call
+const TOOL_DESCRIPTIONS: Record<string, { label: string; describeArgs: (args: Record<string, string | null>) => string }> = {
+  log_search: {
+    label: "Searching logs",
+    describeArgs: (args) => {
+      const parts: string[] = [];
+      if (args.service) parts.push(`service "${args.service}"`);
+      if (args.contains) parts.push(`containing "${args.contains}"`);
+      if (args.level)    parts.push(`level ${args.level}`);
+      return parts.length > 0
+        ? `Looking through log files for ${parts.join(", ")}`
+        : "Scanning all log files";
+    },
+  },
+  list_runbooks: {
+    label: "Listing runbooks",
+    describeArgs: () => "Checking what runbooks (fix guides) are available",
+  },
+  read_runbook: {
+    label: "Reading runbook",
+    describeArgs: (args) =>
+      args.filename
+        ? `Reading the "${args.filename}" fix guide for remediation steps`
+        : "Reading a runbook",
+  },
+  policy_check: {
+    label: "Running compliance check",
+    describeArgs: () =>
+      "Checking if this incident triggers any compliance or policy flags (PII, SLO breach, regulated domains, etc.)",
+  },
 };
 
 function formatTime(ts?: string) {
@@ -67,13 +99,20 @@ function SimpleItem({ event }: { event: StreamEvent }) {
   const cfg = SIMPLE_CONFIG[event.type] ?? { icon: "·", label: event.type, color: "var(--muted)" };
   const summary = (() => {
     switch (event.type) {
-      case "run_started":     return String(event.data?.incident_text ?? "Run started").slice(0, 120);
+      case "run_started":
+        return `Incident received: "${String(event.data?.incident_text ?? "").slice(0, 100)}"`;
       case "agent_started":
-      case "agent_completed": return String(event.data?.message ?? event.type);
-      case "final_result":    return "Structured incident ticket generated";
-      case "error":           return String(event.data?.message ?? "Unknown error");
-      case "handoff":         return `→ ${String(event.data?.to_agent ?? "unknown")}`;
-      default:                return event.type;
+        return "The AI agent is reading the incident and deciding what to investigate first";
+      case "agent_completed":
+        return "The agent has finished its investigation and is writing up the ticket";
+      case "final_result":
+        return "Analysis complete — structured ticket with severity, root cause, and fix plan is ready";
+      case "error":
+        return String(event.data?.message ?? "Unknown error");
+      case "handoff":
+        return `Passing work to → ${String(event.data?.to_agent ?? "another agent")}`;
+      default:
+        return event.type;
     }
   })();
 
@@ -91,7 +130,7 @@ function SimpleItem({ event }: { event: StreamEvent }) {
         <div className="trace-summary">{summary}</div>
         {event.type === "final_result" && (
           <details className="trace-details">
-            <summary>View ticket JSON</summary>
+            <summary>View raw ticket JSON</summary>
             <pre>{JSON.stringify(event.data?.ticket ?? event.data, null, 2)}</pre>
           </details>
         )}
@@ -103,13 +142,44 @@ function SimpleItem({ event }: { event: StreamEvent }) {
   );
 }
 
+function friendlyResultSummary(toolName: string, preview: string): string {
+  if (!preview) return "";
+  if (preview === "NO_MATCHES") return "No matching log entries found";
+  if (toolName === "list_runbooks") {
+    const names = preview.trim().split("\n").filter(Boolean);
+    return `Found ${names.length} runbook${names.length !== 1 ? "s" : ""}: ${names.join(", ")}`;
+  }
+  if (toolName === "policy_check") {
+    try {
+      const parsed = JSON.parse(preview) as { flags: Array<{ flag: string; reason: string } | string> };
+      if (!parsed.flags || parsed.flags.length === 0) return "No policy flags raised";
+      const labels = parsed.flags.map((f) => (typeof f === "string" ? f : f.flag));
+      return `${labels.length} policy flag${labels.length !== 1 ? "s" : ""} raised: ${labels.join(", ")}`;
+    } catch { /* fall through */ }
+  }
+  if (toolName === "log_search") {
+    const lines = preview.trim().split("\n").filter(Boolean);
+    return `Found ${lines.length} matching log entr${lines.length !== 1 ? "ies" : "y"}`;
+  }
+  if (toolName === "read_runbook") {
+    const chars = preview.length;
+    return `Runbook loaded (${chars} chars) — agent is reading the fix steps`;
+  }
+  return "Result received";
+}
+
 function ToolItem({ call, result }: { call: StreamEvent; result?: StreamEvent }) {
   const toolName = String(call.data?.tool ?? "tool");
   const duration = result ? Number(result.data?.duration_ms ?? 0) : null;
   const isDone = !!result;
   const preview = result ? String(result.data?.result_preview ?? "") : "";
   const args = (call.data?.args ?? {}) as Record<string, string | null>;
-  const argEntries = Object.entries(args).filter(([, v]) => v !== null && v !== undefined && v !== "");
+
+  const toolCfg = TOOL_DESCRIPTIONS[toolName];
+  const displayLabel = toolCfg?.label ?? toolName;
+  const description = toolCfg ? toolCfg.describeArgs(args) : null;
+  const resultSummary = friendlyResultSummary(toolName, preview);
+  const isNoMatch = preview === "NO_MATCHES";
 
   return (
     <div className="trace-item trace-item--tool">
@@ -117,7 +187,7 @@ function ToolItem({ call, result }: { call: StreamEvent; result?: StreamEvent })
       <div className="trace-content">
         <div className="trace-top-row">
           <span className="trace-event-badge" style={{ color: "var(--event-tool-call)" }}>
-            → {toolName}
+            🔍 {displayLabel}
           </span>
           {call.agent && <span className="trace-agent">{call.agent}</span>}
           <span className="trace-meta">
@@ -127,20 +197,17 @@ function ToolItem({ call, result }: { call: StreamEvent; result?: StreamEvent })
           </span>
         </div>
 
-        {argEntries.length > 0 && (
-          <div className="trace-args-row">
-            {argEntries.map(([k, v]) => (
-              <span key={k} className="trace-arg">
-                <span className="trace-arg-key">{k}:</span>
-                <span className="trace-arg-val">"{v}"</span>
-              </span>
-            ))}
+        {description && <div className="trace-summary trace-summary--tool">{description}</div>}
+
+        {isDone && resultSummary && (
+          <div className={`trace-tool-result${isNoMatch ? " trace-tool-result--empty" : ""}`}>
+            {isNoMatch ? "⚠ " : "✓ "}{resultSummary}
           </div>
         )}
 
-        {preview && (
+        {preview && !isNoMatch && (
           <details className="trace-details">
-            <summary>{preview === "NO_MATCHES" ? "No matches" : "Result"}</summary>
+            <summary>View raw data</summary>
             <pre>{preview}</pre>
           </details>
         )}
@@ -200,7 +267,7 @@ export default function TracePanel({ runId, events, isRunning }: TracePanelProps
               <div className="trace-item trace-item--pending">
                 <div className="trace-dot trace-dot--pulse" />
                 <div className="trace-content">
-                  <span className="muted-text small">Agent reasoning…</span>
+                  <span className="muted-text small">Agent is thinking — deciding what to investigate next…</span>
                 </div>
               </div>
             )}
