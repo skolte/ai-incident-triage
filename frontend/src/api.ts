@@ -1,13 +1,41 @@
 export type EventType =
   | "run_started"
   | "agent_started"
+  | "status"
   | "tool_call"
   | "tool_result"
   | "agent_completed"
   | "handoff"
   | "final_result"
+  | "metrics"
   | "error"
   | "heartbeat";
+
+export interface MetricsData {
+  prompt_tokens:      number;
+  completion_tokens:  number;
+  total_tokens:       number;
+  estimated_cost_usd: number;
+  latency_ms:         number;
+  tool_count:         number;
+  tool_durations:     Array<{ tool: string; duration_ms: number }>;
+  langsmith_url?:     string | null;
+}
+
+export interface TraceRun {
+  id: string;
+  name: string;
+  run_type: string;
+  status: string;
+  start_time: string | null;
+  end_time: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;    
+  inputs: Record<string, unknown> | null;
+  outputs: Record<string, unknown> | null;
+  error: string | null;  
+}
 
 export interface StreamEvent {
   type: EventType;
@@ -54,6 +82,13 @@ export async function startTriage(incidentText: string): Promise<TriageStartResp
   return response.json();
 }
 
+export async function getTrace(runId: string): Promise<Record<string, TraceRun>> {
+  const response = await fetch(`${API_BASE}/api/triage/${runId}/trace`);
+  if (!response.ok) throw new Error("Trace not available.");
+  const data = await response.json();
+  return data.runs;
+}
+
 export function connectToRunStream(
   runId: string,
   onEvent: (event: StreamEvent) => void,
@@ -64,11 +99,13 @@ export function connectToRunStream(
   const eventTypes: EventType[] = [
     "run_started",
     "agent_started",
+    "status",
     "tool_call",
     "tool_result",
     "agent_completed",
     "handoff",
     "final_result",
+    "metrics",
     "error",
   ];
 
