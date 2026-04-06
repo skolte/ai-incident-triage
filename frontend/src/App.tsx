@@ -61,7 +61,8 @@ export default function App() {
   const [lastText, setLastText]       = useState<string>("");
   const [historyKey, setHistoryKey]   = useState(0);   // bumped to refresh RunHistoryPanel
 
-  const cleanupRef = useRef<null | (() => void)>(null);
+  const cleanupRef  = useRef<null | (() => void)>(null);
+  const metricsRef  = useRef<MetricsData | null>(null);   // always-current metrics for saveRunRecord
 
   function handleGoHome() {
     if (cleanupRef.current) {
@@ -97,30 +98,32 @@ export default function App() {
         result.run_id,
         (event) => {
           setEvents((prev) => [...prev, event]);
-          if (event.type === "metrics")      setMetrics(event.data as unknown as MetricsData);
+          if (event.type === "metrics") {
+            const m = event.data as unknown as MetricsData;
+            metricsRef.current = m;
+            setMetrics(m);
+          }
           if (event.type === "final_result") {
             const t = event.data.ticket as IncidentTicket | undefined;
             if (t) setTicket(t);
             setIsRunning(false);
-            // Persist run summary for the observability history panel
-            setMetrics((m) => {
-              if (m) {
-                saveRunRecord({
-                  runId: result.run_id,
-                  timestamp: new Date().toISOString(),
-                  incidentText: incidentText,
-                  ticketTitle: t?.title,
-                  severity: t?.severity,
-                  cost: m.estimated_cost_usd,
-                  tokens: m.total_tokens,
-                  latencyMs: m.latency_ms,
-                  toolCount: m.tool_count,
-                  langsmithUrl: m.langsmith_url,
-                });
-                setHistoryKey((k) => k + 1);
-              }
-              return m;
-            });
+            // Persist to localStorage — read from ref so metrics are guaranteed available
+            const m = metricsRef.current;
+            if (m) {
+              saveRunRecord({
+                runId: result.run_id,
+                timestamp: new Date().toISOString(),
+                incidentText: incidentText,
+                ticketTitle: t?.title,
+                severity: t?.severity,
+                cost: m.estimated_cost_usd,
+                tokens: m.total_tokens,
+                latencyMs: m.latency_ms,
+                toolCount: m.tool_count,
+                langsmithUrl: m.langsmith_url,
+              });
+              setHistoryKey((k) => k + 1);
+            }
           }
           if (event.type === "error") {
             setAppError(typeof event.data.message === "string" ? event.data.message : "Backend error");

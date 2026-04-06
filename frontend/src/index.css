@@ -1820,6 +1820,11 @@ button, input, textarea, select { font: inherit; }
   font-size: 0.8rem;
 }
 
+.rh-wrap--empty {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
 /* Trace tool result line */
 .trace-summary--tool {
   color: var(--muted);

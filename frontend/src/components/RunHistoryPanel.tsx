@@ -79,7 +79,23 @@ export default function RunHistoryPanel({ refreshKey }: RunHistoryPanelProps) {
   void refreshKey;
   const history = loadRunHistory();
 
-  if (history.length === 0) return null;
+  if (history.length === 0) {
+    return (
+      <div className="rh-wrap rh-wrap--empty">
+        <div className="rh-header">
+          <div className="rh-header-left">
+            <span className="rh-icon">📊</span>
+            <div>
+              <div className="rh-title">Observability Dashboard</div>
+              <div className="rh-subtitle">
+                Run a scenario above to see token costs, latency, and tool usage for each triage run
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const totalCost    = history.reduce((s, r) => s + r.cost, 0);
   const totalTokens  = history.reduce((s, r) => s + r.tokens, 0);
