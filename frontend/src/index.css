@@ -710,6 +710,29 @@ button, input, textarea, select { font: inherit; }
   border-style: dashed;
 }
 
+.obs-sample-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sev3);
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.obs-sample-note {
+  font-size: 0.74rem;
+  color: var(--muted);
+  background: rgba(217, 119, 6, 0.06);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
 .obs-waiting {
   display: flex;
   align-items: center;

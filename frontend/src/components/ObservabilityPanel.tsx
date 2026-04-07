@@ -1,5 +1,23 @@
 import type { MetricsData } from "../api";
 
+const SAMPLE_METRICS: MetricsData = {
+  prompt_tokens:      2847,
+  completion_tokens:  583,
+  total_tokens:       3430,
+  estimated_cost_usd: 0.000777,
+  latency_ms:         8432,
+  tool_count:         6,
+  tool_durations: [
+    { tool: "log_search",    duration_ms: 45 },
+    { tool: "list_runbooks", duration_ms: 12 },
+    { tool: "read_runbook",  duration_ms: 18 },
+    { tool: "log_search",    duration_ms: 38 },
+    { tool: "policy_check",  duration_ms: 8  },
+    { tool: "log_search",    duration_ms: 41 },
+  ],
+  langsmith_url: null,
+};
+
 interface ObservabilityPanelProps {
   metrics: MetricsData | null;
   isRunning?: boolean;
@@ -76,7 +94,8 @@ function ToolDurationList({ durations }: { durations: Array<{ tool: string; dura
 }
 
 export default function ObservabilityPanel({ metrics, isRunning }: ObservabilityPanelProps) {
-  if (!metrics) {
+  // While actively running, show collecting state
+  if (!metrics && isRunning) {
     return (
       <div className="obs-panel obs-panel--waiting">
         <div className="obs-header">
@@ -84,27 +103,22 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
           <span className="obs-model">gpt-4o-mini</span>
         </div>
         <div className="obs-waiting">
-          {isRunning ? (
-            <>
-              <span className="obs-waiting-dot" />
-              Collecting metrics — tokens, cost, and latency will appear when the agent finishes...
-            </>
-          ) : (
-            <>
-              No metrics available. Metrics are emitted after the agent completes successfully.
-              If the run errored, the agent may not have reached the metrics stage.
-            </>
-          )}
+          <span className="obs-waiting-dot" />
+          Collecting metrics — tokens, cost, and latency will appear when the agent finishes...
         </div>
       </div>
     );
   }
 
+  // Use real metrics if available, otherwise fall back to sample data for demo
+  const isSample = !metrics;
+  const data = metrics ?? SAMPLE_METRICS;
+
   const avgToolMs =
-    metrics.tool_durations.length > 0
+    data.tool_durations.length > 0
       ? Math.round(
-          metrics.tool_durations.reduce((s, d) => s + d.duration_ms, 0) /
-            metrics.tool_durations.length
+          data.tool_durations.reduce((s, d) => s + d.duration_ms, 0) /
+            data.tool_durations.length
         )
       : 0;
 
@@ -113,11 +127,12 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
       <div className="obs-header">
         <span className="obs-title">Observability</span>
         <div className="obs-header-right">
+          {isSample && <span className="obs-sample-badge">Sample Data</span>}
           <span className="obs-model">gpt-4o-mini</span>
-          {metrics.langsmith_url && (
+          {data.langsmith_url && (
             <a
               className="obs-langsmith-link"
-              href={metrics.langsmith_url}
+              href={data.langsmith_url}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -127,28 +142,34 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
         </div>
       </div>
 
+      {isSample && (
+        <div className="obs-sample-note">
+          Showing representative data from a typical triage run. Live metrics appear when the backend agent completes successfully.
+        </div>
+      )}
+
       <div className="obs-grid">
         {/* Token usage */}
         <div className="obs-card obs-card--wide">
           <div className="obs-card-label">Token Usage</div>
           <TokenBar
-            prompt={metrics.prompt_tokens}
-            completion={metrics.completion_tokens}
-            total={metrics.total_tokens}
+            prompt={data.prompt_tokens}
+            completion={data.completion_tokens}
+            total={data.total_tokens}
           />
         </div>
 
         {/* Cost */}
         <div className="obs-card">
           <div className="obs-card-label">Estimated Cost</div>
-          <div className="obs-stat">{formatCost(metrics.estimated_cost_usd)}</div>
+          <div className="obs-stat">{formatCost(data.estimated_cost_usd)}</div>
           <div className="obs-stat-sub">gpt-4o-mini</div>
         </div>
 
         {/* Latency */}
         <div className="obs-card">
           <div className="obs-card-label">Total Latency</div>
-          <div className="obs-stat">{formatLatency(metrics.latency_ms)}</div>
+          <div className="obs-stat">{formatLatency(data.latency_ms)}</div>
           <div className="obs-stat-sub">agent + tools</div>
         </div>
 
@@ -157,10 +178,10 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
           <div className="obs-card-label">
             Tool Performance
             <span className="obs-card-label-sub">
-              {metrics.tool_count} calls · avg {avgToolMs}ms
+              {data.tool_count} calls · avg {avgToolMs}ms
             </span>
           </div>
-          <ToolDurationList durations={metrics.tool_durations} />
+          <ToolDurationList durations={data.tool_durations} />
         </div>
       </div>
     </div>
