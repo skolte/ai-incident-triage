@@ -181,72 +181,230 @@ const DESIGN_DECISIONS = [
 export default function ArchitecturePanel() {
   return (
     <div className="arch">
-      {/* ── Section: Architecture Diagram ─────────────────────── */}
+      {/* ── Section: Application Architecture Diagram ─────────── */}
       <section className="arch-section">
         <div className="arch-section-header">
           <span className="arch-section-icon">&#9783;</span>
           <div>
-            <h3 className="arch-section-title">System Architecture</h3>
+            <h3 className="arch-section-title">Application Architecture</h3>
             <p className="arch-section-desc">End-to-end request flow from browser to AI agent and back</p>
           </div>
         </div>
 
-        <div className="arch-diagram">
-          <div className="arch-diagram-col">
-            <div className="arch-node arch-node--user">
-              <span className="arch-node-icon">&#9653;</span>
-              <div>
-                <div className="arch-node-label">React Frontend</div>
-                <div className="arch-node-sub">Vite + TypeScript</div>
+        <div className="diag">
+          {/* Row 1: User + Frontend */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--green">
+              <div className="diag-box-label">User (Browser)</div>
+            </div>
+            <div className="diag-conn">
+              <div className="diag-conn-line" />
+              <span className="diag-conn-label">incident text</span>
+            </div>
+            <div className="diag-box diag-box--green">
+              <div className="diag-box-title">React Frontend</div>
+              <div className="diag-box-sub">Vite + TypeScript + SSE</div>
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* Row 2: API layer */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--yellow">
+              <div className="diag-box-title">FastAPI</div>
+              <div className="diag-box-sub">POST /api/triage &rarr; run_id</div>
+              <div className="diag-box-sub">GET /api/triage/stream/&#123;id&#125; &rarr; SSE</div>
+            </div>
+            <div className="diag-conn">
+              <div className="diag-conn-line" />
+              <span className="diag-conn-label">asyncio.Queue</span>
+            </div>
+            <div className="diag-box diag-box--blue">
+              <div className="diag-box-title">RunStore</div>
+              <div className="diag-box-sub">In-memory run state</div>
+              <div className="diag-box-sub">Queue per run + SSE formatter</div>
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* Row 3: Orchestrator */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--blue">
+              <div className="diag-box-title">SingleAgentOrchestrator</div>
+              <div className="diag-box-sub">Lifecycle: run_started &rarr; agent &rarr; final_result</div>
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* Row 4: Agent + Tools */}
+          <div className="diag-row diag-row--agent">
+            <div className="diag-box diag-box--purple diag-box--lg">
+              <div className="diag-box-title">TriageAgent (LangGraph ReAct)</div>
+              <div className="diag-box-sub">gpt-4o-mini (temp=0) &middot; tool-calling loop &middot; structured output</div>
+              <div className="diag-agent-inner">
+                <div className="diag-agent-loop">
+                  <div className="diag-loop-label">ReAct Loop</div>
+                  <div className="diag-loop-steps">
+                    <span className="diag-loop-step">Observe</span>
+                    <span className="diag-loop-arrow">&rarr;</span>
+                    <span className="diag-loop-step">Think</span>
+                    <span className="diag-loop-arrow">&rarr;</span>
+                    <span className="diag-loop-step">Act (tool call)</span>
+                    <span className="diag-loop-arrow">&rarr;</span>
+                    <span className="diag-loop-step">Repeat</span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="arch-arrow">POST /api/triage</div>
 
-            <div className="arch-node arch-node--infra">
-              <span className="arch-node-icon">&#9729;</span>
-              <div>
-                <div className="arch-node-label">AWS Cloud</div>
-                <div className="arch-node-sub">CloudFront &rarr; ALB &rarr; ECS Fargate</div>
+            <div className="diag-conn">
+              <div className="diag-conn-line" />
+              <span className="diag-conn-label">tool calls</span>
+            </div>
+
+            <div className="diag-tools-col">
+              {TOOLS.map((t) => (
+                <div key={t.name} className="diag-tool" style={{ borderLeftColor: t.color }}>
+                  <code className="diag-tool-name">{t.name}</code>
+                  {t.args && <span className="diag-tool-args">({t.args})</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* Row 5: Output */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--teal">
+              <div className="diag-box-title">IncidentTicket</div>
+              <div className="diag-box-sub">Pydantic v2 validated JSON (11 fields)</div>
+            </div>
+            <div className="diag-conn diag-conn--reverse">
+              <div className="diag-conn-line" />
+              <span className="diag-conn-label">SSE events stream back to UI</span>
+            </div>
+            <div className="diag-box diag-box--green">
+              <div className="diag-box-title">Frontend UI</div>
+              <div className="diag-box-sub">TracePanel + TicketViewer + Observability</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section: AWS Deployment Diagram ───────────────────── */}
+      <section className="arch-section">
+        <div className="arch-section-header">
+          <span className="arch-section-icon">&#9729;</span>
+          <div>
+            <h3 className="arch-section-title">AWS Deployment Architecture</h3>
+            <p className="arch-section-desc">Cloud infrastructure provisioned via CloudFormation (19 resources)</p>
+          </div>
+        </div>
+
+        <div className="diag">
+          {/* Top row: Users */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--green">
+              <div className="diag-box-label">Users</div>
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* CDN + Frontend */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--orange">
+              <div className="diag-box-title">CloudFront CDN</div>
+              <div className="diag-box-sub">HTTPS termination</div>
+            </div>
+            <div className="diag-conn">
+              <div className="diag-conn-line" />
+            </div>
+            <div className="diag-box diag-box--orange">
+              <div className="diag-box-title">AWS Amplify</div>
+              <div className="diag-box-sub">React build (frontend/dist)</div>
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* VPC boundary */}
+          <div className="diag-vpc">
+            <div className="diag-vpc-label">VPC 10.20.0.0/16</div>
+
+            {/* ALB */}
+            <div className="diag-row">
+              <div className="diag-box diag-box--orange">
+                <div className="diag-box-title">Application Load Balancer</div>
+                <div className="diag-box-sub">Internet-facing &middot; Port 80 &middot; 300s timeout</div>
               </div>
             </div>
-            <div className="arch-arrow">routes to container</div>
+            <div className="diag-vert" />
 
-            <div className="arch-node arch-node--api">
-              <span className="arch-node-icon">&#9881;</span>
-              <div>
-                <div className="arch-node-label">FastAPI</div>
-                <div className="arch-node-sub">Creates run_id + asyncio.Queue, starts background task</div>
+            {/* Target Group */}
+            <div className="diag-row">
+              <div className="diag-box diag-box--yellow">
+                <div className="diag-box-title">Target Group</div>
+                <div className="diag-box-sub">Health check: /healthz (HTTP 200, 10s interval)</div>
               </div>
             </div>
-            <div className="arch-arrow">delegates to orchestrator</div>
+            <div className="diag-vert" />
 
-            <div className="arch-node arch-node--orch">
-              <span className="arch-node-icon">&#9654;</span>
-              <div>
-                <div className="arch-node-label">SingleAgentOrchestrator</div>
-                <div className="arch-node-sub">Lifecycle: run_started &rarr; agent &rarr; final_result</div>
+            {/* Subnets + ECS */}
+            <div className="diag-row">
+              <div className="diag-subnet">
+                <div className="diag-subnet-label">Public Subnet A (10.20.1.0/24)</div>
+                <div className="diag-box diag-box--purple">
+                  <div className="diag-box-title">ECS Service</div>
+                  <div className="diag-box-sub">Fargate &middot; 512 CPU &middot; 1024 MB</div>
+                </div>
+              </div>
+              <div className="diag-conn">
+                <div className="diag-conn-line diag-conn-line--dashed" />
+                <span className="diag-conn-label">AZ failover</span>
+              </div>
+              <div className="diag-subnet">
+                <div className="diag-subnet-label">Public Subnet B (10.20.2.0/24)</div>
+                <div className="diag-box diag-box--purple diag-box--faded">
+                  <div className="diag-box-title">ECS (standby)</div>
+                  <div className="diag-box-sub">Available for scaling</div>
+                </div>
               </div>
             </div>
-            <div className="arch-arrow">invokes agent</div>
+            <div className="diag-vert" />
 
-            <div className="arch-node arch-node--agent">
-              <span className="arch-node-icon">&#10070;</span>
-              <div>
-                <div className="arch-node-label">TriageAgent (LangGraph ReAct)</div>
-                <div className="arch-node-sub">gpt-4o-mini &middot; tool-calling loop &middot; structured output</div>
+            {/* Container detail */}
+            <div className="diag-row">
+              <div className="diag-box diag-box--blue diag-box--lg">
+                <div className="diag-box-title">Docker Container</div>
+                <div className="diag-box-sub">Python 3.11-slim &middot; FastAPI + LangGraph Agent</div>
+                <div className="diag-container-inner">
+                  <span className="diag-container-chip">FastAPI</span>
+                  <span className="diag-container-chip">LangGraph</span>
+                  <span className="diag-container-chip">LangChain</span>
+                  <span className="diag-container-chip">Pydantic</span>
+                </div>
               </div>
             </div>
           </div>
+          <div className="diag-vert" />
 
-          <div className="arch-diagram-col arch-diagram-col--tools">
-            <div className="arch-tools-label">Agent Tools</div>
-            {TOOLS.map((t) => (
-              <div key={t.name} className="arch-tool-card" style={{ borderLeftColor: t.color }}>
-                <code className="arch-tool-name">{t.name}</code>
-                {t.args && <span className="arch-tool-args">({t.args})</span>}
-                <p className="arch-tool-desc">{t.desc}</p>
-              </div>
-            ))}
+          {/* External services */}
+          <div className="diag-row">
+            <div className="diag-box diag-box--teal">
+              <div className="diag-box-title">OpenAI API</div>
+              <div className="diag-box-sub">gpt-4o-mini</div>
+            </div>
+            <div className="diag-box diag-box--yellow">
+              <div className="diag-box-title">LangSmith</div>
+              <div className="diag-box-sub">Tracing (optional)</div>
+            </div>
+            <div className="diag-box diag-box--orange">
+              <div className="diag-box-title">CloudWatch</div>
+              <div className="diag-box-sub">Logs (14-day retention)</div>
+            </div>
+            <div className="diag-box diag-box--orange">
+              <div className="diag-box-title">Amazon ECR</div>
+              <div className="diag-box-sub">Docker image registry</div>
+            </div>
           </div>
         </div>
       </section>

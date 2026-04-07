@@ -2172,6 +2172,333 @@ button, input, textarea, select { font: inherit; }
   line-height: 1.6;
 }
 
+/* =====================
+   Architecture Diagrams
+   ===================== */
+
+.diag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+/* Diagram rows */
+.diag-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.diag-row--agent {
+  align-items: stretch;
+}
+
+/* Boxes */
+.diag-box {
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: 2px solid;
+  text-align: center;
+  min-width: 140px;
+  max-width: 340px;
+  flex-shrink: 0;
+}
+
+.diag-box--lg {
+  max-width: 420px;
+  min-width: 260px;
+}
+
+.diag-box--faded {
+  opacity: 0.45;
+}
+
+.diag-box-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.diag-box-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.diag-box-sub {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Color variants */
+.diag-box--green {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-color: #4ade80;
+}
+
+.diag-box--blue {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-color: #60a5fa;
+}
+
+.diag-box--purple {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  border-color: #a78bfa;
+}
+
+.diag-box--yellow {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #f59e0b;
+}
+
+.diag-box--orange {
+  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+  border-color: #fb923c;
+}
+
+.diag-box--teal {
+  background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+  border-color: #2dd4bf;
+}
+
+/* Connectors — horizontal */
+.diag-conn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  min-width: 60px;
+  flex-shrink: 1;
+}
+
+.diag-conn-line {
+  width: 100%;
+  min-width: 36px;
+  height: 2px;
+  background: var(--panel-border);
+  position: relative;
+}
+
+.diag-conn-line::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border: 5px solid transparent;
+  border-left: 6px solid var(--panel-border);
+}
+
+.diag-conn--reverse .diag-conn-line::after {
+  right: auto;
+  left: -1px;
+  border-left: none;
+  border-right: 6px solid var(--panel-border);
+}
+
+.diag-conn-line--dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--panel-border) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.diag-conn-line--dashed::after {
+  display: none;
+}
+
+.diag-conn-label {
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+/* Connectors — vertical */
+.diag-vert {
+  width: 2px;
+  height: 20px;
+  background: var(--panel-border);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.diag-vert::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: -4px;
+  border: 5px solid transparent;
+  border-top: 6px solid var(--panel-border);
+}
+
+/* Agent inner: ReAct loop */
+.diag-agent-inner {
+  margin-top: 10px;
+}
+
+.diag-agent-loop {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px dashed #a78bfa;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.diag-loop-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7c3aed;
+  margin-bottom: 4px;
+}
+
+.diag-loop-steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.diag-loop-step {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #c4b5fd;
+  border-radius: 5px;
+  padding: 2px 8px;
+}
+
+.diag-loop-arrow {
+  font-size: 0.72rem;
+  color: #a78bfa;
+}
+
+/* Tools column in diagram */
+.diag-tools-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.diag-tool {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid;
+  text-align: left;
+}
+
+.diag-tool-name {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.diag-tool-args {
+  font-size: 0.64rem;
+  color: var(--muted);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  margin-left: 3px;
+}
+
+/* VPC boundary */
+.diag-vpc {
+  width: 100%;
+  border: 2px dashed #94a3b8;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  position: relative;
+  background: rgba(148, 163, 184, 0.04);
+}
+
+.diag-vpc-label {
+  position: absolute;
+  top: -10px;
+  left: 20px;
+  background: var(--panel);
+  padding: 0 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Subnet boxes */
+.diag-subnet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: rgba(241, 245, 249, 0.5);
+  flex: 1;
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.diag-subnet-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #64748b;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* Container inner chips */
+.diag-container-inner {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.diag-container-chip {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #1e40af;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* Responsive diagram */
+@media (max-width: 700px) {
+  .diag-row { flex-direction: column; gap: 0; }
+  .diag-conn {
+    transform: rotate(90deg);
+    padding: 6px 0;
+    min-width: auto;
+  }
+  .diag-box { max-width: 100%; min-width: 0; width: 100%; }
+  .diag-box--lg { max-width: 100%; }
+  .diag-tools-col { width: 100%; }
+  .diag-subnet { max-width: 100%; }
+}
+
 /* Observability & Tokenomics explainer */
 
 .arch-obs-explainer {

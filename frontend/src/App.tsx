@@ -328,6 +328,7 @@ export default function App() {
       {!isLanding && (
         <>
           <PipelineViz events={events} isRunning={isRunning} />
+          <ObservabilityPanel metrics={metrics} isRunning={isRunning} />
 
           <main className="run-grid">
             {/* Left: form (compact) */}
@@ -343,9 +344,8 @@ export default function App() {
             {/* Center: trace */}
             <TracePanel runId={runId} events={events} isRunning={isRunning} />
 
-            {/* Right: obs + ticket + langsmith */}
+            {/* Right: ticket + langsmith */}
             <div className="run-right">
-              <ObservabilityPanel metrics={metrics} isRunning={isRunning} />
               <TicketViewer ticket={ticket} />
               <LangSmithTrace runId={runId} isRunning={isRunning} />
             </div>
