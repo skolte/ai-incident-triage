@@ -345,7 +345,7 @@ export default function App() {
 
             {/* Right: obs + ticket + langsmith */}
             <div className="run-right">
-              <ObservabilityPanel metrics={metrics} />
+              <ObservabilityPanel metrics={metrics} isRunning={isRunning} />
               <TicketViewer ticket={ticket} />
               <LangSmithTrace runId={runId} isRunning={isRunning} />
             </div>

@@ -2149,6 +2149,89 @@ button, input, textarea, select { font: inherit; }
   line-height: 1.6;
 }
 
+/* Observability & Tokenomics explainer */
+
+.arch-obs-explainer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.arch-obs-card {
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+}
+
+.arch-obs-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.arch-obs-card-text {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0 0 6px;
+}
+
+.arch-obs-card-text:last-child { margin-bottom: 0; }
+
+.arch-obs-card-text code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.arch-obs-pricing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.arch-obs-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+}
+
+.arch-obs-price-label {
+  font-size: 0.76rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.arch-obs-price-value {
+  font-size: 0.76rem;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.arch-obs-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.arch-obs-metrics-list strong {
+  color: var(--text);
+}
+
 /* AWS Infrastructure grid */
 
 .arch-aws-grid {

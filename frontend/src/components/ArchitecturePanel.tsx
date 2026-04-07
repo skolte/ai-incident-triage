@@ -303,6 +303,78 @@ export default function ArchitecturePanel() {
         </div>
       </section>
 
+      {/* ── Section: Observability & Tokenomics ────────────── */}
+      <section className="arch-section">
+        <div className="arch-section-header">
+          <span className="arch-section-icon">&#9888;</span>
+          <div>
+            <h3 className="arch-section-title">Observability & Tokenomics</h3>
+            <p className="arch-section-desc">How tokens, costs, and latency are tracked and displayed</p>
+          </div>
+        </div>
+
+        <div className="arch-obs-explainer">
+          <div className="arch-obs-card">
+            <div className="arch-obs-card-title">Data Collection</div>
+            <p className="arch-obs-card-text">
+              The <code>TriageAgent</code> collects metrics throughout its execution. Token counts are extracted
+              from the LLM response via <code>usage_metadata</code> (or legacy <code>response_metadata</code>).
+              Tool durations are measured with <code>time.monotonic()</code> around each tool call.
+              End-to-end latency is measured from agent start to completion.
+            </p>
+          </div>
+
+          <div className="arch-obs-card">
+            <div className="arch-obs-card-title">When Metrics Are Emitted</div>
+            <p className="arch-obs-card-text">
+              The <code>metrics</code> SSE event is emitted <strong>after</strong> <code>agent_completed</code> and
+              <strong> before</strong> <code>final_result</code>. If the agent errors out (bad JSON, schema validation
+              failure), the exception skips past the metrics code — so metrics are <strong>only available on successful runs</strong>.
+            </p>
+          </div>
+
+          <div className="arch-obs-card">
+            <div className="arch-obs-card-title">Cost Calculation (gpt-4o-mini)</div>
+            <p className="arch-obs-card-text">
+              Costs are estimated using OpenAI's published pricing constants hardcoded in <code>triage_agent.py</code>:
+            </p>
+            <div className="arch-obs-pricing">
+              <div className="arch-obs-price-row">
+                <span className="arch-obs-price-label">Input (prompt) tokens</span>
+                <code className="arch-obs-price-value">$0.150 / 1M tokens</code>
+              </div>
+              <div className="arch-obs-price-row">
+                <span className="arch-obs-price-label">Output (completion) tokens</span>
+                <code className="arch-obs-price-value">$0.600 / 1M tokens</code>
+              </div>
+            </div>
+            <p className="arch-obs-card-text">
+              Formula: <code>cost = (prompt_tokens * $0.00000015) + (completion_tokens * $0.0000006)</code>
+            </p>
+          </div>
+
+          <div className="arch-obs-card">
+            <div className="arch-obs-card-title">What's Displayed</div>
+            <div className="arch-obs-metrics-list">
+              <div><strong>Token Usage</strong> — stacked bar showing prompt vs completion tokens</div>
+              <div><strong>Estimated Cost</strong> — USD cost for the run based on gpt-4o-mini pricing</div>
+              <div><strong>Total Latency</strong> — end-to-end wall-clock time (agent + all tool calls)</div>
+              <div><strong>Tool Performance</strong> — per-tool latency bar chart with call count and average</div>
+              <div><strong>LangSmith Link</strong> — direct link to the full execution trace in LangSmith</div>
+            </div>
+          </div>
+
+          <div className="arch-obs-card">
+            <div className="arch-obs-card-title">Run History (localStorage)</div>
+            <p className="arch-obs-card-text">
+              After each successful run, the frontend persists a record to <code>localStorage</code> containing
+              run ID, timestamp, incident text, ticket title, severity, cost, tokens, latency, tool count, and
+              LangSmith URL. The RunHistoryPanel displays up to 10 recent runs with aggregate stats.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ── Section: Technology Stack ────────────────────────── */}
       <section className="arch-section">
         <div className="arch-section-header">

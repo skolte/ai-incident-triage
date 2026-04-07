@@ -2,6 +2,7 @@ import type { MetricsData } from "../api";
 
 interface ObservabilityPanelProps {
   metrics: MetricsData | null;
+  isRunning?: boolean;
 }
 
 function formatCost(usd: number): string {
@@ -74,7 +75,7 @@ function ToolDurationList({ durations }: { durations: Array<{ tool: string; dura
   );
 }
 
-export default function ObservabilityPanel({ metrics }: ObservabilityPanelProps) {
+export default function ObservabilityPanel({ metrics, isRunning }: ObservabilityPanelProps) {
   if (!metrics) {
     return (
       <div className="obs-panel obs-panel--waiting">
@@ -83,8 +84,17 @@ export default function ObservabilityPanel({ metrics }: ObservabilityPanelProps)
           <span className="obs-model">gpt-4o-mini</span>
         </div>
         <div className="obs-waiting">
-          <span className="obs-waiting-dot" />
-          Waiting for metrics...
+          {isRunning ? (
+            <>
+              <span className="obs-waiting-dot" />
+              Collecting metrics — tokens, cost, and latency will appear when the agent finishes...
+            </>
+          ) : (
+            <>
+              No metrics available. Metrics are emitted after the agent completes successfully.
+              If the run errored, the agent may not have reached the metrics stage.
+            </>
+          )}
         </div>
       </div>
     );
