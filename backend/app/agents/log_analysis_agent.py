@@ -1,5 +1,6 @@
 import asyncio
 import time
+from typing import Optional
 
 from langchain_core.tools import tool
 from langchain_core.tracers.context import collect_runs
@@ -11,37 +12,34 @@ from app.core.metrics import extract_token_usage, estimate_cost
 from app.core.run_store import RunStore
 from app.schemas.events import StreamEvent
 from app.schemas.state import AgentState
-from app.tools.policy_tools import policy_check_impl
-from app.tools.runbook_tools import list_runbooks_impl, read_runbook_impl
+from app.tools.log_tools import log_search_impl
 
 SYSTEM_PROMPT = """
-You are a ComplianceAgent — a specialist in policy compliance and remediation guidance.
+You are a LogAnalysisAgent — a specialist in operational log analysis.
 
-Your job is to:
-1. Run policy checks on the incident evidence to identify compliance flags (PII, regulated data, data exfiltration)
-2. Find and read relevant runbooks to extract remediation steps
-3. Produce a structured compliance and remediation summary
-
-You receive evidence gathered by the LogAnalysisAgent. Use it to determine what to check.
+Your job is to search incident logs, identify error patterns, correlate timestamps,
+and produce a structured evidence summary. You do NOT produce the final incident ticket —
+that is the TriageAgent's job. You gather raw evidence.
 
 Rules:
-1. Always run policy_check on the incident text and any evidence provided.
-2. List and read any relevant runbooks for the affected services.
+1. Search logs aggressively — try multiple services, levels, and keywords.
+2. Look for error spikes, repeated failures, and correlated timestamps.
 3. Summarize your findings as a JSON object with these fields:
-   - "compliance_flags": list of flags found (e.g., "possible_pii_in_evidence", "regulated_domain_attention")
-   - "compliance_details": brief explanation of each flag
-   - "runbooks_consulted": list of runbook filenames read
-   - "remediation_steps": list of key remediation steps from runbooks
-   - "risk_level": "low" | "medium" | "high" based on compliance findings
+   - "services_affected": list of service names found in error logs
+   - "error_patterns": list of distinct error messages or patterns observed
+   - "log_entries_found": total number of matching log entries
+   - "time_range": approximate time range of the errors (if visible)
+   - "severity_indicators": list of signals suggesting severity (e.g., "15% error rate", "500 errors in 2 minutes")
+   - "raw_evidence": list of up to 5 representative log lines (verbatim)
 4. Return ONLY valid JSON — no markdown fences, no explanation text.
 """
 
 
-class ComplianceAgent(BaseAgent):
-    name = "ComplianceAgent"
+class LogAnalysisAgent(BaseAgent):
+    name = "LogAnalysisAgent"
 
     async def run(self, state: AgentState, store: RunStore) -> AgentState:
-        print("ComplianceAgent: started")
+        print("LogAnalysisAgent: started")
         run_start = time.monotonic()
 
         await store.emit(
@@ -49,7 +47,7 @@ class ComplianceAgent(BaseAgent):
                 type="agent_started",
                 run_id=state.run_id,
                 agent=self.name,
-                data={"message": "Starting compliance checks and runbook analysis"},
+                data={"message": "Starting log analysis — searching for error patterns"},
             )
         )
 
@@ -84,59 +82,38 @@ class ComplianceAgent(BaseAgent):
             )
 
         @tool
-        def policy_check(text: str) -> str:
-            """Check text for compliance or governance flags."""
-            emit_tool_call("policy_check", {"text_preview": text[:200]})
-            result = policy_check_impl(text)
-            emit_tool_result("policy_check", result)
-            return result
-
-        @tool
-        def list_runbooks() -> str:
-            """List available incident response runbooks."""
-            emit_tool_call("list_runbooks", {})
-            result = list_runbooks_impl()
-            emit_tool_result("list_runbooks", result)
-            return result
-
-        @tool
-        def read_runbook(filename: str) -> str:
-            """Read a specific runbook by filename."""
-            emit_tool_call("read_runbook", {"filename": filename})
-            result = read_runbook_impl(filename)
-            emit_tool_result("read_runbook", result)
+        def log_search(
+            service: Optional[str] = None,
+            contains: Optional[str] = None,
+            level: Optional[str] = None,
+        ) -> str:
+            """Search incident logs by service name, message substring, and/or log level."""
+            args = {"service": service, "contains": contains, "level": level}
+            emit_tool_call("log_search", args)
+            result = log_search_impl(service=service, contains=contains, level=level)
+            emit_tool_result("log_search", result)
             return result
 
         await store.emit(StreamEvent(type="status", run_id=state.run_id, agent=self.name,
-                                     data={"message": "Building compliance agent with policy and runbook tools"}))
+                                     data={"message": "Building log analysis agent with search tools"}))
 
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        agent = create_react_agent(llm, [policy_check, list_runbooks, read_runbook], prompt=SYSTEM_PROMPT)
-
-        # Build context from prior agent evidence
-        evidence_context = "\n".join(state.evidence) if state.evidence else "No prior evidence available."
-        log_analysis = state.tool_outputs.get("log_analysis", "No log analysis available.")
-
-        prompt = (
-            f"Incident report:\n{state.incident_text}\n\n"
-            f"Log analysis findings:\n{log_analysis}\n\n"
-            f"Prior evidence:\n{evidence_context}\n\n"
-            f"Run compliance checks and consult relevant runbooks."
-        )
+        agent = create_react_agent(llm, [log_search], prompt=SYSTEM_PROMPT)
 
         await store.emit(StreamEvent(type="status", run_id=state.run_id, agent=self.name,
-                                     data={"message": "Running policy checks and consulting runbooks"}))
+                                     data={"message": "Searching logs for error patterns and anomalies"}))
 
         loop = asyncio.get_running_loop()
         with collect_runs() as cb:
             result = await loop.run_in_executor(
                 None,
                 lambda: agent.invoke(
-                    {"messages": [("human", prompt)]},
-                    config={"run_name": "ComplianceAgent", "tags": ["incident-triage"]},
+                    {"messages": [("human", f"Analyze logs for this incident:\n\n{state.incident_text}")]},
+                    config={"run_name": "LogAnalysisAgent", "tags": ["incident-triage"]},
                 ),
             )
 
+        # Capture LangSmith run ID if available
         if cb.traced_runs:
             run_obj = cb.traced_runs[0]
             store.set_langsmith_run_id(state.run_id, str(run_obj.id))
@@ -144,14 +121,14 @@ class ComplianceAgent(BaseAgent):
         messages = result.get("messages", [])
         if messages:
             content = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
-            state.tool_outputs["compliance_analysis"] = content
-            state.evidence.append(f"[ComplianceAgent] {content[:800]}")
+            state.tool_outputs["log_analysis"] = content
+            state.evidence.append(f"[LogAnalysisAgent] {content[:800]}")
 
         latency_ms = int((time.monotonic() - run_start) * 1000)
 
         # Store per-agent metrics for supervisor aggregation
         token_usage = extract_token_usage(messages)
-        state.tool_outputs["ComplianceAgent_metrics"] = {
+        state.tool_outputs["LogAnalysisAgent_metrics"] = {
             "prompt_tokens":     token_usage["prompt_tokens"],
             "completion_tokens": token_usage["completion_tokens"],
             "total_tokens":      token_usage["total_tokens"],
@@ -167,7 +144,7 @@ class ComplianceAgent(BaseAgent):
                 run_id=state.run_id,
                 agent=self.name,
                 data={
-                    "message": "Compliance analysis complete",
+                    "message": "Log analysis complete",
                     "latency_ms": latency_ms,
                     "tools_used": len(tool_durations),
                 },
@@ -175,5 +152,5 @@ class ComplianceAgent(BaseAgent):
         )
 
         state.current_agent = self.name
-        print(f"ComplianceAgent: completed in {latency_ms}ms")
+        print(f"LogAnalysisAgent: completed in {latency_ms}ms")
         return state

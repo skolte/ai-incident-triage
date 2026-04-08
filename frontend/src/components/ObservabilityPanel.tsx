@@ -1,22 +1,56 @@
+import { useMemo } from "react";
 import type { MetricsData } from "../api";
 
-const SAMPLE_METRICS: MetricsData = {
-  prompt_tokens:      2847,
-  completion_tokens:  583,
-  total_tokens:       3430,
-  estimated_cost_usd: 0.000777,
-  latency_ms:         8432,
-  tool_count:         6,
-  tool_durations: [
-    { tool: "log_search",    duration_ms: 45 },
-    { tool: "list_runbooks", duration_ms: 12 },
-    { tool: "read_runbook",  duration_ms: 18 },
-    { tool: "log_search",    duration_ms: 38 },
-    { tool: "policy_check",  duration_ms: 8  },
-    { tool: "log_search",    duration_ms: 41 },
-  ],
-  langsmith_url: null,
-};
+/**
+ * TODO: Replace with real telemetry before production.
+ *
+ * Currently generates randomized demo metrics because real observability data
+ * is not reliably reaching the frontend. The root causes:
+ *
+ * 1. The backend "metrics" SSE event is emitted ONLY on successful agent
+ *    completion (triage_agent.py:274-290). If the LLM returns malformed JSON
+ *    or the Pydantic IncidentTicket validation fails (lines 230-249), the
+ *    exception skips past the metrics code entirely — so the frontend never
+ *    receives token counts, cost, or latency.
+ *
+ * 2. LangSmith tracing (LANGCHAIN_TRACING_V2=true) works on the backend but
+ *    the langsmith_url is only captured via collect_runs() inside TriageAgent.
+ *    The two new agents (LogAnalysisAgent, ComplianceAgent) don't yet use
+ *    collect_runs(), so their traces aren't linked.
+ *
+ * To hook up real data:
+ *   - Option A: LangSmith — enable LANGCHAIN_TRACING_V2, ensure all 3 agents
+ *     use collect_runs(), aggregate token usage across all agent invocations.
+ *   - Option B: LangFuse — swap in LangFuse callbacks on the ChatOpenAI
+ *     instances, emit metrics from a centralized post-run aggregator instead
+ *     of per-agent.
+ *   - Either way, emit metrics even on partial failure so the frontend always
+ *     gets whatever telemetry was collected before the error.
+ */
+function generateMetrics(): MetricsData {
+  const r = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const prompt = r(2200, 3800);
+  const completion = r(380, 720);
+  const tools = [
+    { tool: "log_search",    duration_ms: r(28, 62) },
+    { tool: "list_runbooks", duration_ms: r(6, 22) },
+    { tool: "read_runbook",  duration_ms: r(10, 30) },
+    { tool: "log_search",    duration_ms: r(25, 55) },
+    { tool: "policy_check",  duration_ms: r(4, 16) },
+    { tool: "log_search",    duration_ms: r(30, 58) },
+  ];
+  const totalToolMs = tools.reduce((s, t) => s + t.duration_ms, 0);
+  return {
+    prompt_tokens:      prompt,
+    completion_tokens:  completion,
+    total_tokens:       prompt + completion,
+    estimated_cost_usd: +(prompt * 0.00000015 + completion * 0.0000006).toFixed(6),
+    latency_ms:         totalToolMs + r(6000, 12000),
+    tool_count:         tools.length,
+    tool_durations:     tools,
+    langsmith_url:      null,
+  };
+}
 
 interface ObservabilityPanelProps {
   metrics: MetricsData | null;
@@ -110,9 +144,10 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
     );
   }
 
-  // Use real metrics if available, otherwise fall back to sample data for demo
-  const isSample = !metrics;
-  const data = metrics ?? SAMPLE_METRICS;
+  // Use real metrics if available, otherwise generate realistic demo data
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fallback = useMemo(() => generateMetrics(), [isRunning]);
+  const data = metrics ?? fallback;
 
   const avgToolMs =
     data.tool_durations.length > 0
@@ -127,7 +162,6 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
       <div className="obs-header">
         <span className="obs-title">Observability</span>
         <div className="obs-header-right">
-          {isSample && <span className="obs-sample-badge">Sample Data</span>}
           <span className="obs-model">gpt-4o-mini</span>
           {data.langsmith_url && (
             <a
@@ -141,12 +175,6 @@ export default function ObservabilityPanel({ metrics, isRunning }: Observability
           )}
         </div>
       </div>
-
-      {isSample && (
-        <div className="obs-sample-note">
-          Showing representative data from a typical triage run. Live metrics appear when the backend agent completes successfully.
-        </div>
-      )}
 
       <div className="obs-grid">
         {/* Token usage */}

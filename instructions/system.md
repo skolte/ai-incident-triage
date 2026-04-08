@@ -1,7 +1,7 @@
 # AI Incident Triage System — Master Reference Document
 
 > **Maintained automatically.** Run the `/update-system-doc` agent after every significant feature addition or bug fix.
-> Last updated: 2026-04-06
+> Last updated: 2026-04-07
 
 ---
 
@@ -64,19 +64,28 @@ FastAPI (app.py)
    │  creates run_id + asyncio.Queue
    │  starts background task
    ▼
-SingleAgentOrchestrator
-   │  emits: run_started
-   ▼
-TriageAgent (LangGraph ReAct)
-   │  emits: agent_started, status, tool_call, tool_result, agent_completed, metrics
+SupervisorOrchestrator
+   │  emits: run_started (lists all 3 agents)
    │
-   ├── log_search(service, contains, level)    → searches logs.jsonl
-   ├── list_runbooks()                         → lists markdown runbooks
-   ├── read_runbook(filename)                  → reads runbook content
-   └── policy_check(text)                      → keyword compliance scan
+   ├─▶ handoff → LogAnalysisAgent (LangGraph ReAct)
+   │      │  emits: agent_started, status, tool_call, tool_result, agent_completed
+   │      └── log_search(service, contains, level)    → searches logs.jsonl
+   │      stores evidence + tool_outputs in AgentState
    │
-   ▼
-IncidentTicket (Pydantic schema validation)
+   ├─▶ handoff → ComplianceAgent (LangGraph ReAct)
+   │      │  emits: agent_started, status, tool_call, tool_result, agent_completed
+   │      ├── policy_check(text)                      → keyword compliance scan
+   │      ├── list_runbooks()                         → lists markdown runbooks
+   │      └── read_runbook(filename)                  → reads runbook content
+   │      receives LogAnalysisAgent evidence, stores compliance findings in AgentState
+   │
+   └─▶ handoff → TriageAgent (LangGraph ReAct)
+          │  emits: agent_started, status, tool_call, tool_result, agent_completed, metrics
+          ├── log_search, list_runbooks, read_runbook, policy_check (all 4 tools)
+          └── receives all prior agent evidence in prompt
+          │
+          ▼
+   IncidentTicket (Pydantic schema validation)
    │
    ▼
 final_result event → SSE → React frontend
@@ -88,7 +97,7 @@ final_result event → SSE → React frontend
 POST /api/triage
   → run_id = uuid4()
   → RunStore.create_run(run_id)         # allocates asyncio.Queue
-  → asyncio.create_task(orchestrator.run(...))
+  → asyncio.create_task(SupervisorOrchestrator.run(...))
   → returns {run_id} immediately
 
 GET /api/triage/stream/{run_id}
@@ -146,11 +155,13 @@ GET /api/triage/stream/{run_id}
 backend/app/
 ├── app.py                              ← FastAPI app, 6 endpoints, CORS, background tasks
 ├── orchestrators/
-│   ├── single_agent_orchestrator.py   ← run_started → agent → final_result lifecycle
-│   └── supervisor_orchestrator.py     ← STUB: ready for multi-agent expansion
+│   ├── single_agent_orchestrator.py   ← run_started → agent → final_result lifecycle (legacy)
+│   └── supervisor_orchestrator.py     ← Multi-agent: LogAnalysis → Compliance → Triage with handoffs
 ├── agents/
 │   ├── base_agent.py                  ← Abstract BaseAgent (run interface)
-│   └── triage_agent.py                ← LangGraph ReAct agent + tool wrappers + metrics
+│   ├── log_analysis_agent.py          ← LogAnalysisAgent: log_search tool, error pattern identification
+│   ├── compliance_agent.py            ← ComplianceAgent: policy_check + runbook tools, compliance flags
+│   └── triage_agent.py                ← TriageAgent: all 4 tools, synthesizes prior evidence into IncidentTicket
 ├── tools/
 │   ├── log_tools.py                   ← log_search_impl: reads logs.jsonl (up to 10 matches)
 │   ├── runbook_tools.py               ← list_runbooks_impl, read_runbook_impl (markdown files)
@@ -188,23 +199,23 @@ backend/app/
 Events flow in this sequence per run:
 
 ```
-run_started → agent_started → [status]* → [tool_call → tool_result]* → agent_completed → metrics → final_result
-                                                                                         (or error)
+run_started → [handoff → agent_started → [status]* → [tool_call → tool_result]* → agent_completed]×3 → metrics → final_result
+                                                                                                               (or error)
 ```
 
 | Event | Emitter | Key Data |
 |---|---|---|
-| `run_started` | Orchestrator | `incident_text` |
-| `agent_started` | TriageAgent | `message` |
-| `status` | TriageAgent | `message` (step-by-step progress) |
-| `tool_call` | TriageAgent tool wrapper | `tool`, `args` |
-| `tool_result` | TriageAgent tool wrapper | `tool`, `result_preview`, `duration_ms` |
-| `agent_completed` | TriageAgent | `message` |
+| `run_started` | SupervisorOrchestrator | `incident_text`, `orchestrator`, `agents` (list of 3 agent names) |
+| `handoff` | SupervisorOrchestrator | `to_agent`, `reason` (emitted before each agent starts) |
+| `agent_started` | Each agent | `message` |
+| `status` | Each agent | `message` (step-by-step progress) |
+| `tool_call` | Each agent's tool wrapper | `tool`, `args` |
+| `tool_result` | Each agent's tool wrapper | `tool`, `result_preview`, `duration_ms` |
+| `agent_completed` | Each agent | `message`, `latency_ms`, `tools_used` |
 | `metrics` | TriageAgent | `prompt_tokens`, `completion_tokens`, `total_tokens`, `estimated_cost_usd`, `latency_ms`, `tool_count`, `tool_durations`, `langsmith_url` |
-| `final_result` | Orchestrator | `ticket` (full IncidentTicket JSON) |
-| `error` | Orchestrator (catch) | `message` |
+| `final_result` | SupervisorOrchestrator | `ticket` (full IncidentTicket JSON) |
+| `error` | SupervisorOrchestrator (catch) | `message` |
 | `heartbeat` | SSE endpoint | (keepalive, every 15s timeout) |
-| `handoff` | Pre-defined in schema | Ready for multi-agent use |
 
 ### IncidentTicket Schema
 
@@ -243,7 +254,19 @@ run_started → agent_started → [status]* → [tool_call → tool_result]* →
 
 ### Agent System Prompt Rules
 
-The TriageAgent system prompt enforces:
+**LogAnalysisAgent** system prompt enforces:
+1. Search logs aggressively across multiple services, levels, and keywords
+2. Look for error spikes, repeated failures, and correlated timestamps
+3. Return structured JSON with: `services_affected`, `error_patterns`, `log_entries_found`, `time_range`, `severity_indicators`, `raw_evidence`
+4. Return only valid JSON — no markdown fences
+
+**ComplianceAgent** system prompt enforces:
+1. Always run `policy_check` on incident text and evidence
+2. List and read relevant runbooks for affected services
+3. Return structured JSON with: `compliance_flags`, `compliance_details`, `runbooks_consulted`, `remediation_steps`, `risk_level`
+4. Return only valid JSON — no markdown fences
+
+**TriageAgent** system prompt enforces:
 1. Use tools before making conclusions
 2. Prefer log evidence and runbook guidance over guessing
 3. Include concrete evidence strings in the `evidence` field
@@ -252,6 +275,7 @@ The TriageAgent system prompt enforces:
 6. Do not invent impacted services without evidence
 7. Use conservative severity unless evidence clearly supports SEV1
 8. Confidence must decrease when evidence is weak
+9. When prior agent evidence is available, incorporate it into reasoning
 
 ---
 
@@ -267,9 +291,10 @@ frontend/src/
     ├── IncidentForm.tsx            ← Textarea + submit button
     ├── TracePanel.tsx              ← Live event stream, tool call timeline
     ├── TicketViewer.tsx            ← Structured ticket display (severity badge, sections)
+    ├── PipelineViz.tsx             ← 3-agent pipeline visualization (Log Analysis → Compliance → Triage) with per-agent state
     ├── ObservabilityPanel.tsx      ← Token usage bar, cost, latency, tool performance chart
     ├── LangSmithTrace.tsx          ← Post-run LangSmith trace table (fetches from /trace)
-    └── ArchitecturePanel.tsx       ← Interactive architecture reference (diagram, workflow, tech stack)
+    └── ArchitecturePanel.tsx       ← Interactive architecture reference (multi-agent diagrams, workflow, tech stack)
 ```
 
 ### UI Components
@@ -360,6 +385,16 @@ Defined in `backend/ai-incident-full-stack.yaml` (CloudFormation). **19 resource
 - [x] System prompt with strict JSON-only output enforcement
 - [x] `gpt-4o-mini` model (temperature=0 for determinism)
 
+### Multi-Agent Supervisor Architecture
+- [x] SupervisorOrchestrator coordinates 3 sequential specialist agents with handoff events
+- [x] LogAnalysisAgent: searches logs using `log_search`, identifies error patterns, timestamps, service failures; stores structured evidence in shared `AgentState`
+- [x] ComplianceAgent: runs `policy_check`, `list_runbooks`, `read_runbook`; receives LogAnalysisAgent evidence; produces compliance flags and remediation steps
+- [x] TriageAgent: receives all prior agent evidence in prompt context; synthesizes into final `IncidentTicket`
+- [x] Shared `AgentState` carries `evidence`, `tool_outputs`, and `compliance_flags` between agents
+- [x] `handoff` SSE events emitted between each agent transition for real-time UI visualization
+- [x] PipelineViz component shows 3 agent nodes with individual state tracking
+- [x] TracePanel enhanced to display agent names, handoff reasons, and orchestrator details
+
 ### Streaming & Observability
 - [x] Real-time SSE streaming via `asyncio.Queue` per run
 - [x] 11 event types with sequence numbers and timestamps
@@ -416,8 +451,11 @@ Defined in `backend/ai-incident-full-stack.yaml` (CloudFormation). **19 resource
 ### System prompt: JSON-only, no markdown fences
 **Why:** The output is parsed directly with `json.loads()`. Any wrapping (```json...```) breaks parsing. The prompt explicitly forbids fences and explanation text. Pydantic then validates the parsed dict against `IncidentTicket`.
 
-### `supervisor_orchestrator.py` stub + `handoff` event type
-**Why:** The architecture was designed from day one to support multi-agent expansion. The stub and the pre-defined `handoff` event type mean adding a supervisor pattern requires filling in the existing structure, not redesigning it.
+### Sequential multi-agent pipeline (not parallel)
+**Why:** The three agents have data dependencies: ComplianceAgent needs LogAnalysisAgent's evidence, and TriageAgent needs both. Sequential execution with shared `AgentState` is simpler and more deterministic than parallel fan-out with merge logic. Each agent's output is appended to `state.evidence` and `state.tool_outputs` for downstream consumption.
+
+### Shared `AgentState` for inter-agent communication
+**Why:** Rather than passing messages between agents via an LLM-mediated conversation, we use a structured Pydantic `AgentState` object with typed fields (`evidence`, `tool_outputs`, `compliance_flags`). This avoids token waste and ensures downstream agents receive complete, untruncated evidence.
 
 ### In-memory RunStore (no persistence)
 **Why:** Intentional simplicity for the learning/demo scope. Runs are transient — they live for the duration of the server process. Persistence (DynamoDB, PostgreSQL) is a planned roadmap item.
@@ -460,19 +498,9 @@ Defined in `backend/ai-incident-full-stack.yaml` (CloudFormation). **19 resource
 
 ## Future Roadmap
 
-### Phase 1 — Multi-Agent Supervisor Architecture (Highest Priority)
+### ~~Phase 1 — Multi-Agent Supervisor Architecture~~ COMPLETED (2026-04-07)
 
-```
-SupervisorAgent
-  ├── LogAnalysisAgent    ← searches logs, identifies patterns
-  ├── ComplianceAgent     ← runs policy checks, flags violations
-  └── RunbookAgent        ← finds and summarizes remediation steps
-```
-
-- Supervisor decides which specialists to invoke and in what order based on incident type
-- Uses `handoff` event type (already in schema)
-- Fill in `supervisor_orchestrator.py` stub
-- **Resume bullet:** Designed hierarchical multi-agent system with dynamic routing and specialist agent coordination.
+Moved to [Implemented Features > Multi-Agent Supervisor Architecture](#implemented-features).
 
 ### Phase 2 — Human-in-the-Loop Escalation
 

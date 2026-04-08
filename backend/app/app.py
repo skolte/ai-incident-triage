@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from app.core.run_store import RunStore
 from app.core.sse import format_sse, format_heartbeat
-from app.orchestrators.single_agent_orchestrator import SingleAgentOrchestrator
+from app.orchestrators.supervisor_orchestrator import SupervisorOrchestrator
 from app.schemas.api import TriageRequest, TriageStartResponse
 from app.schemas.events import StreamEvent
 
@@ -23,7 +23,7 @@ ls_client = LangSmithClient()
 # The FastAPI application is initialized, along with the RunStore for managing the state of runs and the SingleAgentOrchestrator for processing incidents with a single agent.
 app = FastAPI()
 store = RunStore()
-orchestrator = SingleAgentOrchestrator()
+orchestrator = SupervisorOrchestrator()
 
 origins_env = os.getenv("ALLOWED_ORIGINS", "")
 allowed_origins = [o.strip() for o in origins_env.split(",") if o.strip()]

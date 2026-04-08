@@ -97,20 +97,29 @@ function formatTime(ts?: string) {
 
 function SimpleItem({ event }: { event: StreamEvent }) {
   const cfg = SIMPLE_CONFIG[event.type] ?? { icon: "·", label: event.type, color: "var(--muted)" };
+  const agentName = event.agent ?? "";
   const summary = (() => {
     switch (event.type) {
-      case "run_started":
-        return `Incident received: "${String(event.data?.incident_text ?? "").slice(0, 100)}"`;
+      case "run_started": {
+        const agents = event.data?.agents as string[] | undefined;
+        const orch = event.data?.orchestrator as string | undefined;
+        const base = `Incident received: "${String(event.data?.incident_text ?? "").slice(0, 100)}"`;
+        if (orch && agents) return `${base}\nOrchestrator: ${orch} → ${agents.join(" → ")}`;
+        return base;
+      }
       case "agent_started":
-        return "The AI agent is reading the incident and deciding what to investigate first";
+        return String(event.data?.message ?? `${agentName || "AI agent"} is starting analysis`);
       case "agent_completed":
-        return "The agent has finished its investigation and is writing up the ticket";
+        return String(event.data?.message ?? `${agentName || "Agent"} has finished`);
       case "final_result":
         return "Analysis complete — structured ticket with severity, root cause, and fix plan is ready";
       case "error":
         return String(event.data?.message ?? "Unknown error");
-      case "handoff":
-        return `Passing work to → ${String(event.data?.to_agent ?? "another agent")}`;
+      case "handoff": {
+        const to = String(event.data?.to_agent ?? "another agent");
+        const reason = event.data?.reason ? `: ${String(event.data.reason)}` : "";
+        return `Handing off to ${to}${reason}`;
+      }
       default:
         return event.type;
     }

@@ -11,6 +11,7 @@ from langsmith import Client as LangSmithClient
 from langgraph.prebuilt import create_react_agent
 
 from app.agents.base_agent import BaseAgent
+from app.core.metrics import extract_token_usage, estimate_cost
 from app.core.run_store import RunStore
 from app.schemas.events import StreamEvent
 from app.schemas.incident import IncidentTicket
@@ -52,40 +53,7 @@ IncidentTicket schema:
 }
 """
 
-# gpt-4o-mini pricing (per token)
-_INPUT_COST_PER_TOKEN  = 0.000_000_150   # $0.150 / 1M
-_OUTPUT_COST_PER_TOKEN = 0.000_000_600   # $0.600 / 1M
-
-
-def _extract_token_usage(messages: list) -> dict:
-    """
-    Sum token counts across all AI messages in the result.
-    Handles both usage_metadata (langchain-core >= 0.2) and
-    response_metadata["token_usage"] (older langchain-openai style).
-    """
-    prompt_tokens = 0
-    completion_tokens = 0
-
-    for msg in messages:
-        # Newer API: usage_metadata attribute
-        usage_meta = getattr(msg, "usage_metadata", None)
-        if usage_meta:
-            prompt_tokens     += usage_meta.get("input_tokens", 0)
-            completion_tokens += usage_meta.get("output_tokens", 0)
-            continue
-
-        # Older API: response_metadata["token_usage"]
-        resp_meta = getattr(msg, "response_metadata", {}) or {}
-        tu = resp_meta.get("token_usage", {})
-        if tu:
-            prompt_tokens     += tu.get("prompt_tokens", 0)
-            completion_tokens += tu.get("completion_tokens", 0)
-
-    return {
-        "prompt_tokens":     prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens":      prompt_tokens + completion_tokens,
-    }
+# Token extraction and cost calculation are in app.core.metrics (shared across agents)
 
 
 class TriageAgent(BaseAgent):
@@ -193,6 +161,16 @@ class TriageAgent(BaseAgent):
         print("TriageAgent: invoking agent")
         await store.emit(StreamEvent(type="status", run_id=state.run_id, agent=self.name,
                                      data={"message": "Invoking agent — reasoning in progress"}))
+
+        # Build the user message — include evidence from prior agents if available
+        user_msg = state.incident_text
+        if state.evidence:
+            prior_evidence = "\n".join(state.evidence)
+            user_msg = (
+                f"{state.incident_text}\n\n"
+                f"--- Prior agent findings ---\n{prior_evidence}"
+            )
+
         # collect_runs() is a LangChain context manager that captures the IDs of
         # any LangSmith traces created inside the block. This lets us retrieve the
         # trace URL afterwards and surface it in the UI.
@@ -202,7 +180,7 @@ class TriageAgent(BaseAgent):
             result = await loop.run_in_executor(
                 None,
                 lambda: agent.invoke(
-                    {"messages": [("user", state.incident_text)]},
+                    {"messages": [("user", user_msg)]},
                     config={
                         "run_name": "TriageAgent",
                         "tags": ["incident-triage"],
@@ -263,29 +241,30 @@ class TriageAgent(BaseAgent):
         )
 
         # --- Observability metrics ---
-        token_usage = _extract_token_usage(messages)
-        estimated_cost = round(
-            token_usage["prompt_tokens"]     * _INPUT_COST_PER_TOKEN +
-            token_usage["completion_tokens"] * _OUTPUT_COST_PER_TOKEN,
-            6,
-        )
+        token_usage = extract_token_usage(messages)
+        estimated_cost = estimate_cost(token_usage["prompt_tokens"], token_usage["completion_tokens"])
         total_latency_ms = int((time.monotonic() - run_start) * 1000)
 
+        # Store per-agent metrics in state for supervisor aggregation
+        state.tool_outputs["TriageAgent_metrics"] = {
+            "prompt_tokens":     token_usage["prompt_tokens"],
+            "completion_tokens": token_usage["completion_tokens"],
+            "total_tokens":      token_usage["total_tokens"],
+            "estimated_cost_usd": estimated_cost,
+            "latency_ms":        total_latency_ms,
+            "tool_count":        len(tool_durations),
+            "tool_durations":    tool_durations,
+            "langsmith_url":     langsmith_url,
+        }
+
+        # Emit per-agent metrics (used by SingleAgentOrchestrator;
+        # SupervisorOrchestrator will emit aggregated metrics that override this)
         await store.emit(
             StreamEvent(
                 type="metrics",
                 run_id=state.run_id,
                 agent=self.name,
-                data={
-                    "prompt_tokens":     token_usage["prompt_tokens"],
-                    "completion_tokens": token_usage["completion_tokens"],
-                    "total_tokens":      token_usage["total_tokens"],
-                    "estimated_cost_usd": estimated_cost,
-                    "latency_ms":        total_latency_ms,
-                    "tool_count":        len(tool_durations),
-                    "tool_durations":    tool_durations,
-                    "langsmith_url":     langsmith_url,
-                },
+                data=state.tool_outputs["TriageAgent_metrics"],
             )
         )
 

@@ -113,49 +113,58 @@ const WORKFLOW_STEPS = [
   },
   {
     num: "2",
-    title: "Orchestrator Initializes",
-    desc: "SingleAgentOrchestrator creates an asyncio.Queue for the run, emits run_started, and hands off to the TriageAgent.",
+    title: "Supervisor Orchestrator Initializes",
+    desc: "SupervisorOrchestrator creates an asyncio.Queue, emits run_started, and begins routing through three specialist agents sequentially.",
     accent: "var(--event-run)",
   },
   {
     num: "3",
-    title: "ReAct Agent Reasons",
-    desc: "The LangGraph ReAct agent analyzes the incident, decides which tools to call, and iterates until it has enough evidence.",
-    accent: "var(--event-agent)",
-  },
-  {
-    num: "4",
-    title: "Tools Gather Evidence",
-    desc: "The agent calls log_search, list_runbooks, read_runbook, and policy_check — each emitting tool_call and tool_result events in real time.",
+    title: "LogAnalysisAgent — Evidence Gathering",
+    desc: "Searches logs aggressively using log_search to identify error patterns, service failures, and correlated timestamps. Produces a structured evidence summary stored in shared state.",
     accent: "var(--event-tool-call)",
   },
   {
+    num: "4",
+    title: "ComplianceAgent — Policy & Runbook Analysis",
+    desc: "Receives log evidence, runs policy_check for PII/compliance flags, and consults runbooks for remediation guidance. Adds compliance findings to shared state.",
+    accent: "var(--event-handoff)",
+  },
+  {
     num: "5",
-    title: "Ticket Generated",
-    desc: "The agent produces a structured IncidentTicket (JSON) validated by Pydantic — with severity, root cause, evidence, mitigation plan, and compliance flags.",
-    accent: "var(--event-final)",
+    title: "TriageAgent — Final Synthesis",
+    desc: "Receives all accumulated evidence from prior agents. Synthesizes into a structured IncidentTicket (JSON) validated by Pydantic — with severity, root cause, evidence, mitigation plan, and compliance flags.",
+    accent: "var(--event-agent)",
   },
   {
     num: "6",
     title: "Streamed to UI",
-    desc: "Every step streams via SSE to the frontend in real time. The UI renders the trace timeline, observability metrics, and final ticket as events arrive.",
+    desc: "Every step from all three agents streams via SSE to the frontend in real time. Handoff events mark transitions between agents. The UI renders the trace timeline, observability metrics, and final ticket.",
     accent: "var(--success)",
   },
 ];
 
 const SSE_EVENTS = [
-  { name: "run_started", emitter: "Orchestrator", color: "var(--event-run)" },
-  { name: "agent_started", emitter: "TriageAgent", color: "var(--event-agent)" },
+  { name: "run_started", emitter: "Supervisor", color: "var(--event-run)" },
+  { name: "handoff", emitter: "Supervisor", color: "var(--event-handoff)" },
+  { name: "agent_started", emitter: "Each agent", color: "var(--event-agent)" },
   { name: "tool_call", emitter: "Tool wrapper", color: "var(--event-tool-call)" },
   { name: "tool_result", emitter: "Tool wrapper", color: "var(--event-tool-result)" },
-  { name: "agent_completed", emitter: "TriageAgent", color: "var(--event-agent)" },
+  { name: "agent_completed", emitter: "Each agent", color: "var(--event-agent)" },
   { name: "metrics", emitter: "TriageAgent", color: "var(--event-run)" },
-  { name: "final_result", emitter: "Orchestrator", color: "var(--event-final)" },
-  { name: "error", emitter: "Orchestrator", color: "var(--event-error)" },
+  { name: "final_result", emitter: "Supervisor", color: "var(--event-final)" },
+  { name: "error", emitter: "Supervisor", color: "var(--event-error)" },
   { name: "heartbeat", emitter: "SSE endpoint", color: "var(--event-muted)" },
 ];
 
 const DESIGN_DECISIONS = [
+  {
+    title: "Multi-agent supervisor pattern",
+    detail: "Three specialist agents (LogAnalysis, Compliance, Triage) coordinated by a SupervisorOrchestrator. State flows sequentially — each agent builds on prior findings via shared AgentState.",
+  },
+  {
+    title: "Handoff events for agent transitions",
+    detail: "The supervisor emits handoff events between agents so the UI can visualize transitions. Each agent emits its own agent_started/agent_completed events for fine-grained tracking.",
+  },
   {
     title: "asyncio.Queue per run",
     detail: "Clean per-run isolation — each SSE connection reads only its own queue. No cross-run event leakage.",
@@ -227,23 +236,64 @@ export default function ArchitecturePanel() {
           </div>
           <div className="diag-vert" />
 
-          {/* Row 3: Orchestrator */}
+          {/* Row 3: Supervisor Orchestrator */}
           <div className="diag-row">
-            <div className="diag-box diag-box--blue">
-              <div className="diag-box-title">SingleAgentOrchestrator</div>
-              <div className="diag-box-sub">Lifecycle: run_started &rarr; agent &rarr; final_result</div>
+            <div className="diag-box diag-box--blue diag-box--lg">
+              <div className="diag-box-title">SupervisorOrchestrator</div>
+              <div className="diag-box-sub">Routes agents sequentially with handoff events &middot; Shared AgentState</div>
             </div>
           </div>
           <div className="diag-vert" />
 
-          {/* Row 4: Agent + Tools */}
-          <div className="diag-row diag-row--agent">
+          {/* Row 4: Three agents + tools */}
+          <div className="diag-row">
+            {/* Agent 1: Log Analysis */}
+            <div className="diag-box diag-box--purple">
+              <div className="diag-box-title">LogAnalysisAgent</div>
+              <div className="diag-box-sub">Searches logs &middot; identifies error patterns</div>
+              <div className="diag-container-inner">
+                <span className="diag-container-chip">log_search</span>
+              </div>
+            </div>
+
+            <div className="diag-conn">
+              <div className="diag-conn-line" />
+              <span className="diag-conn-label">handoff</span>
+            </div>
+
+            {/* Agent 2: Compliance */}
+            <div className="diag-box diag-box--purple">
+              <div className="diag-box-title">ComplianceAgent</div>
+              <div className="diag-box-sub">Policy checks &middot; runbook remediation</div>
+              <div className="diag-container-inner">
+                <span className="diag-container-chip">policy_check</span>
+                <span className="diag-container-chip">list_runbooks</span>
+                <span className="diag-container-chip">read_runbook</span>
+              </div>
+            </div>
+
+            <div className="diag-conn">
+              <div className="diag-conn-line" />
+              <span className="diag-conn-label">handoff</span>
+            </div>
+
+            {/* Agent 3: Triage */}
+            <div className="diag-box diag-box--purple">
+              <div className="diag-box-title">TriageAgent</div>
+              <div className="diag-box-sub">Synthesizes evidence &middot; produces ticket</div>
+              <div className="diag-container-inner">
+                <span className="diag-container-chip">all 4 tools</span>
+              </div>
+            </div>
+          </div>
+          <div className="diag-vert" />
+
+          {/* ReAct loop detail */}
+          <div className="diag-row">
             <div className="diag-box diag-box--purple diag-box--lg">
-              <div className="diag-box-title">TriageAgent (LangGraph ReAct)</div>
-              <div className="diag-box-sub">gpt-4o-mini (temp=0) &middot; tool-calling loop &middot; structured output</div>
               <div className="diag-agent-inner">
                 <div className="diag-agent-loop">
-                  <div className="diag-loop-label">ReAct Loop</div>
+                  <div className="diag-loop-label">Each Agent: LangGraph ReAct Loop</div>
                   <div className="diag-loop-steps">
                     <span className="diag-loop-step">Observe</span>
                     <span className="diag-loop-arrow">&rarr;</span>
@@ -654,11 +704,13 @@ export default function ArchitecturePanel() {
           <pre className="arch-schema-code">{`backend/app/
   app.py                            FastAPI app, 6 endpoints, CORS
   orchestrators/
-    single_agent_orchestrator.py    run lifecycle management
-    supervisor_orchestrator.py      multi-agent stub (future)
+    supervisor_orchestrator.py      multi-agent coordinator (active)
+    single_agent_orchestrator.py    single-agent fallback
   agents/
     base_agent.py                   abstract BaseAgent interface
-    triage_agent.py                 LangGraph ReAct agent + tools
+    log_analysis_agent.py           log search & pattern detection
+    compliance_agent.py             policy checks & runbook analysis
+    triage_agent.py                 final ticket synthesis (ReAct)
   tools/
     log_tools.py                    log_search (logs.jsonl)
     runbook_tools.py                list & read runbooks (.md)
@@ -669,7 +721,7 @@ export default function ArchitecturePanel() {
   schemas/
     incident.py                     IncidentTicket model
     events.py                       StreamEvent (11 types)
-    state.py                        AgentState
+    state.py                        AgentState (shared across agents)
     api.py                          request/response models
   data/
     logs.jsonl                      sample operational logs

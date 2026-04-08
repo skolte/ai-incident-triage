@@ -150,7 +150,7 @@ export default function App() {
           <div className="brand-icon">⚡</div>
           <div>
             <h1>Incident Triage Agent</h1>
-            <p className="subtitle">LangGraph · FastAPI · React · AWS ECS Fargate</p>
+            <p className="subtitle">Multi-Agent · LangGraph · FastAPI · React · AWS ECS Fargate</p>
           </div>
         </div>
 

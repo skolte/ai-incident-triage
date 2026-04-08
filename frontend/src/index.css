@@ -1238,7 +1238,13 @@ button, input, textarea, select { font: inherit; }
   transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
 }
 
-.pv-node--agent { min-width: 140px; }
+.pv-node--agent { min-width: 120px; }
+
+.pv-agent-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
 
 .pv-node--idle {
   opacity: 0.45;
