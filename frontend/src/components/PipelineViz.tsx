@@ -35,7 +35,6 @@ export default function PipelineViz({ events, isRunning }: PipelineVizProps) {
   );
 
   const isDone = types.has("final_result");
-  const hasToolCalls = calledTools.size > 0;
 
   const inputState: NodeState = isDone ? "done" : types.has("run_started") ? "active" : "idle";
   const ticketState: NodeState = isDone ? "done" : "idle";
