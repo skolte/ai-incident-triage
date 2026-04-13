@@ -162,6 +162,10 @@ const DESIGN_DECISIONS = [
     detail: "Three specialist agents (LogAnalysis, Compliance, Triage) coordinated by a SupervisorOrchestrator. State flows sequentially — each agent builds on prior findings via shared AgentState.",
   },
   {
+    title: "Sequential over parallel execution",
+    detail: "Agents run sequentially because of data dependencies: Compliance needs Log findings, Triage needs both. Sequential + shared state is simpler and more deterministic than parallel fan-out with merge logic.",
+  },
+  {
     title: "Handoff events for agent transitions",
     detail: "The supervisor emits handoff events between agents so the UI can visualize transitions. Each agent emits its own agent_started/agent_completed events for fine-grained tracking.",
   },
@@ -184,6 +188,10 @@ const DESIGN_DECISIONS = [
   {
     title: "Dual-path token extraction",
     detail: "Handles both new usage_metadata and legacy response_metadata APIs for cross-version LangChain compatibility.",
+  },
+  {
+    title: "In-memory RunStore",
+    detail: "Transient run state lives for the session duration—simplicity by design. Persistence (DynamoDB, PostgreSQL) is a planned roadmap item.",
   },
 ];
 
