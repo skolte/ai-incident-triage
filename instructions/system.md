@@ -1,7 +1,7 @@
 # AI Incident Triage System — Master Reference Document
 
 > **Maintained automatically.** Run the `/update-system-doc` agent after every significant feature addition or bug fix.
-> Last updated: 2026-04-07
+> Last updated: 2026-04-13
 
 ---
 
@@ -10,9 +10,11 @@
 1. [Project Overview](#project-overview)
 2. [Architecture Overview](#architecture-overview)
 3. [Technology Stack](#technology-stack)
+   - [Technology Choices Rationale](#technology-choices-rationale)
+   - [AWS Infrastructure: Multi-Zone High-Availability Architecture](#aws-infrastructure-multi-zone-high-availability-architecture)
 4. [Backend Architecture](#backend-architecture)
 5. [Frontend Architecture](#frontend-architecture)
-6. [AWS Infrastructure](#aws-infrastructure)
+6. [AWS Infrastructure: Resource Inventory](#aws-infrastructure-resource-inventory)
 7. [Implemented Features](#implemented-features)
 8. [Key Design Decisions](#key-design-decisions)
 9. [Bugs & Issues Fixed](#bugs--issues-fixed)
@@ -144,6 +146,168 @@ GET /api/triage/stream/{run_id}
 | Infrastructure as code | AWS CloudFormation (`backend/ai-incident-full-stack.yaml`) |
 | Logging | Amazon CloudWatch |
 | Networking | VPC, Subnets, Security Groups |
+
+### Technology Choices Rationale
+
+#### Why FastAPI for the API Layer?
+
+**Real-Time SSE Streaming**
+- The system streams agent execution events to the frontend in real-time via Server-Sent Events (SSE). FastAPI's native async/await support makes it straightforward to manage long-lived streaming connections and emit events as the agent executes.
+
+**Async-Native Architecture**
+- FastAPI is built on `asyncio`, which is essential for:
+  - Handling multiple concurrent SSE connections (different users running their own triage sessions simultaneously)
+  - Non-blocking I/O when tools make external API calls (log search, policy checks, runbook reads)
+  - Managing the `asyncio.Queue` per run without blocking the event loop
+
+**Background Task Execution**
+- When a triage request arrives (`POST /api/triage`), we immediately return a `run_id` and spawn a background orchestration task that runs asynchronously. FastAPI's `asyncio.create_task()` integration makes this clean and reliable.
+
+**Type Safety & Validation**
+- FastAPI integrates seamlessly with Pydantic, which we already use for schemas. Request/response bodies are automatically validated against `TriageRequest` and `TriageStartResponse` schemas.
+
+**High Performance**
+- FastAPI is one of the fastest Python web frameworks, with sub-millisecond overhead. For a system handling real-time events and concurrent connections, this matters.
+
+#### Agent Orchestration Patterns: Single Agent vs. Sequential Supervisor
+
+**Pattern Overview:**
+
+1. **Single Agent Pattern** (current primary)
+   - One `TriageAgent` handles the entire incident analysis end-to-end
+   - Calls tools (`log_search`, `policy_check`, `list_runbooks`, `read_runbook`) to gather evidence
+   - Produces the final `IncidentTicket` directly
+   - Pros: Simple, deterministic, fewer moving parts
+   - Cons: Single agent becomes complex if it needs to handle very specialized tasks
+
+2. **Sequential Supervisor Pattern** (available alternative)
+   - Three specialist agents run in sequence: `LogAnalysisAgent` → `ComplianceAgent` → `TriageAgent`
+   - Each agent receives accumulated evidence from prior agents via shared `AgentState`
+   - Supervisor orchestrates handoffs and aggregates metrics
+   - Pros: Modular (add new agents without touching existing ones), separation of concerns, easier to extend
+   - Cons: More orchestration complexity, data dependencies must be managed explicitly
+
+**Why Sequential Over Parallel?**
+- LogAnalysisAgent findings inform ComplianceAgent's runbook selection
+- ComplianceAgent compliance flags inform TriageAgent's severity assessment
+- These data dependencies make sequential execution with shared state simpler than parallel fan-out with merge logic
+
+**Why This System Supports Both:**
+- The system is designed to learn orchestration patterns. Both `SingleAgentOrchestrator` and `SupervisorOrchestrator` are implemented
+- For future scaling (RAG agent, approval agent, review agent), the supervisor pattern provides the infrastructure
+- Currently using `SingleAgentOrchestrator` for simplicity; switch to `SupervisorOrchestrator` in `app.py` to enable multi-agent workflow
+
+#### Why CloudFront CDN with HTTPS Termination?
+
+**Performance via Edge Caching**
+- The React frontend (static HTML, JS, CSS) is cached at CloudFront edge locations globally
+- Users download content from the geographically nearest edge location rather than the origin
+- Dramatically reduces latency for international users and high-traffic scenarios
+
+**HTTPS Termination (SSL/TLS Offloading)**
+- CloudFront handles all HTTPS encryption/decryption at the edge
+- Browsers establish TLS connections to CloudFront's edge servers, not directly to the backend
+- Reduces CPU overhead on Amplify and the ALB (they receive unencrypted traffic from CloudFront, encrypted from users)
+- Centralized certificate management — one certificate at CloudFront instead of per-origin
+
+**Security & DDoS Protection**
+- **Origin Hiding**: Only CloudFront's IP addresses are publicly visible; backend IPs remain hidden
+- **AWS Shield Standard**: Built-in DDoS protection at the edge, absorbing volumetric attacks before they reach the origin
+- **Reduced Attack Surface**: Backend is only reachable through CloudFront, not directly from the internet
+- **WAF Integration**: Can attach AWS WAF rules to CloudFront for sophisticated request filtering (rate limiting, geo-blocking, custom rules)
+
+**Cost Efficiency**
+- Caching static assets dramatically reduces the number of requests reaching Amplify and the ALB
+- Fewer origin requests = lower data transfer and compute costs
+- CloudFront data transfer is often cheaper than origin-to-user data transfer
+
+---
+
+## AWS Infrastructure: Multi-Zone High-Availability Architecture
+
+### Reliability Through Geographic Distribution
+
+#### Why Multiple Availability Zones (Multi-AZ)?
+
+**Fault Tolerance**
+- Each ECS task runs in either AZ-a or AZ-b (geographically separate datacenters within the region)
+- If an entire AZ fails (power outage, hardware failure, network partition), the other AZ continues serving traffic
+- The ALB automatically detects failed tasks via health checks and routes all traffic to the healthy AZ
+
+**Zero-Downtime Deployments**
+- When rolling out a new container image, the ECS Service spins up new tasks in healthy AZs while gracefully terminating old ones
+- Users never experience complete outage; traffic seamlessly shifts between task generations
+
+**High Availability (HA) for SLA Compliance**
+- Multi-AZ deployment is industry standard for production workloads
+- Achieves "four nines" uptime (99.99%) when properly configured
+
+#### Why Application Load Balancer (ALB)?
+
+**Layer 7 (Application-Layer) Intelligence**
+- Unlike a classic Load Balancer (Layer 4), the ALB understands HTTP/HTTPS, hostnames, paths
+- Can route `/api/triage` differently from static assets (though currently not used, it's available for future API versioning)
+- Handles HTTP → HTTPS upgrades and custom header injection if needed
+
+**Health Checking**
+- ALB continuously probes the `/healthz` endpoint on each ECS task (10s interval)
+- If a task fails the health check, the ALB removes it from the rotation within seconds
+- Only healthy tasks receive traffic
+
+**Connection Management**
+- Terminates long-lived client connections (SSE streams) and creates new ones to backend tasks
+- 300-second idle timeout prevents hanging connections from consuming resources indefinitely
+
+#### Why Target Group?
+
+**Decoupling Load Balancer from Compute**
+- The Target Group is a logical grouping of backend resources (ECS tasks)
+- The ALB doesn't need to know about individual tasks; it just forwards to the Target Group
+- When ECS scales (spins up/down tasks), the Target Group automatically registers/deregisters them
+- The ALB routing logic doesn't need to change
+
+**Health Check Configuration**
+- Target Group defines health check parameters: endpoint (`/healthz`), HTTP 200 expected, 10s interval
+- Failed tasks are immediately marked unhealthy and removed from rotation
+- Automatic recovery: ECS Service detects the unhealthy task and launches a replacement
+
+#### Why ECS Fargate (Serverless Containers)?
+
+**Zero Infrastructure Management**
+- No EC2 instances to patch, monitor, or scale manually
+- AWS manages the underlying hardware, OS, Docker runtime
+- You declare desired CPU/memory per task (e.g., 512 vCPU, 1024 MB RAM); Fargate allocates and manages infrastructure
+
+**Cost Efficiency**
+- Pay per task-second of execution, not per instance/hour
+- No waste on idle capacity; scale to zero if needed
+- Automatic bin-packing across AZs (AWS optimizes placement)
+
+**Compliance & Security**
+- Each task runs in a fully isolated Linux container (cgroup/namespace isolation)
+- No shared tenancy with other customers (different from EC2 Spot)
+- CloudWatch logs automatically captured
+
+#### Why Docker Containers?
+
+**Reproducibility**
+- The same `Dockerfile` produces identical images whether built on dev machine, CI/CD, or production
+- "Works on my machine" → guaranteed to work in production (same OS, libraries, Python runtime)
+
+**Portability**
+- Push the image to Amazon ECR (Elastic Container Registry)
+- Deploy the same image to dev (local Docker), staging (ECS Fargate), production (ECS Fargate)
+- No dependency on specific infrastructure (swap ECR for DockerHub, ECS for Kubernetes, zero code changes needed)
+
+**Resource Isolation & Efficiency**
+- Each container gets its own isolated filesystem, environment variables, and process space
+- Multiple containers run on a single Fargate task (if needed) or across tasks in different AZs
+- Much lighter than VMs (seconds to start vs. minutes), cheaper than EC2
+
+**Supply Chain & Security**
+- Scan images with Amazon ECR scanning for CVEs before deployment
+- Image immutability: once pushed, an image cannot be modified (only tagged with a new version)
+- Clear audit trail: every deployed image has a commit SHA and build timestamp
 
 ---
 
@@ -348,9 +512,11 @@ frontend/src/
 
 ---
 
-## AWS Infrastructure
+## AWS Infrastructure: Resource Inventory
 
 Defined in `backend/ai-incident-full-stack.yaml` (CloudFormation). **19 resources total**, parameterized with `ContainerImage`, `OpenAIAPIKey`, `AllowedOrigins`, `ContainerPort` (default 8000), `Cpu` (default 512), `Memory` (default 1024), `DesiredCount` (default 1).
+
+**For the design rationale behind these component choices (multi-AZ, ALB, Target Group, ECS Fargate, CloudFront HTTPS, Docker), see [AWS Infrastructure: Multi-Zone High-Availability Architecture](#aws-infrastructure-multi-zone-high-availability-architecture) in the Technology Choices Rationale section above.**
 
 | Component | Role |
 |---|---|
