@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import logoUrl from "./assets/logo.svg";
 import ArchitecturePanel from "./components/ArchitecturePanel";
 import IncidentForm from "./components/IncidentForm";
 import LangSmithTrace from "./components/LangSmithTrace";
@@ -147,7 +148,9 @@ export default function App() {
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="app-header">
         <div className="header-brand">
-          <div className="brand-icon">⚡</div>
+          <div className="brand-icon">
+            <img src={logoUrl} alt="Incident Triage logo" className="brand-logo" />
+          </div>
           <div>
             <h1>Incident Triage Agent</h1>
             <p className="subtitle">Multi-Agent · LangGraph · FastAPI · React · AWS ECS Fargate</p>
