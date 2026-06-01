@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(git *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(ls *)",
+      "Bash(docker ps*)",
+      "Bash(docker inspect*)",
+      "Bash(docker image *)",
+      "Bash(docker-compose *)",
+      "Bash(curl -s *)",
+      "Bash(jq *)"
+    ],
+    "deny": [
+      "Bash(aws *)",
+      "Bash(aws-vault *)",
+      "Bash(terraform *)",
+      "Bash(cloudformation *)",
+      "Bash(kubectl *)",
+      "Bash(rm *)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(git clean*)"
+    ]
+  }
+}

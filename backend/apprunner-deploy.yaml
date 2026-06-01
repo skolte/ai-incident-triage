@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'App Runner deployment for ai-incident-triage backend'
+
+Parameters:
+  ContainerImage:
+    Type: String
+    Description: ECR image URI (e.g., ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/ai-incident-backend:latest)
+
+  OpenAIAPIKey:
+    Type: String
+    NoEcho: true
+    Description: OpenAI API key for LLM agent
+
+  AllowedOrigins:
+    Type: String
+    Default: 'https://main.dlvx8idi4h2r9.amplifyapp.com'
+    Description: Comma-separated CORS origins (frontend domain)
+
+  LangchainApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: LangSmith API key (optional)
+
+Conditions:
+  HasLangchainKey: !Not [!Equals [!Ref LangchainApiKey, '']]
+
+Resources:
+  # IAM Role for App Runner service
+  AppRunnerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ai-incident-apprunner-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSAppRunnerServicePolicyForECRAccess
+
+  # Auto-scaling configuration (single instance, max concurrency 10)
+  AppRunnerAutoScaling:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Properties:
+      AutoScalingConfigurationName: ai-incident-autoscaling
+      MaxConcurrency: 10
+      MinSize: 1
+      MaxSize: 1
+
+  # App Runner service
+  AppRunnerService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: ai-incident-backend
+      SourceConfiguration:
+        ImageRepository:
+          ImageIdentifier: !Ref ContainerImage
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: '8000'
+            RuntimeEnvironmentVariables:
+              - Name: OPENAI_API_KEY
+                Value: !Ref OpenAIAPIKey
+              - Name: ALLOWED_ORIGINS
+                Value: !Ref AllowedOrigins
+              - Name: LANGCHAIN_TRACING_V2
+                Value: 'true'
+              - Name: LANGCHAIN_PROJECT
+                Value: ai-incident-triage
+
+            # Conditionally add LangChain API key if provided
+            - Name: LANGCHAIN_API_KEY
+              Value: !If [HasLangchainKey, !Ref LangchainApiKey, 'disabled']
+
+      AutoScalingConfigurationArn: !GetAtt AppRunnerAutoScaling.AutoScalingConfigurationArn
+
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /healthz
+        Interval: 10
+        Timeout: 5
+        HealthyThreshold: 2
+        UnhealthyThreshold: 5
+
+      InstanceConfiguration:
+        Cpu: 0.5
+        Memory: 1 GB
+
+      NetworkConfiguration:
+        EgressConfiguration:
+          EgressType: DEFAULT
+
+Outputs:
+  ServiceArn:
+    Description: App Runner Service ARN
+    Value: !GetAtt AppRunnerService.ServiceArn
+
+  ServiceUrl:
+    Description: App Runner service URL (HTTPS)
+    Value: !GetAtt AppRunnerService.ServiceUrl
+
+  DeploymentStatus:
+    Description: Deployment status of the service
+    Value: !GetAtt AppRunnerService.Status

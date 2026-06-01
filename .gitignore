@@ -40,3 +40,7 @@ id_ed25519*
 *.pem
 
 *.code-workspace
+
+# Instructions folder (local reference documents)
+/instructions/
+.claude/agents/update-system-doc.md
