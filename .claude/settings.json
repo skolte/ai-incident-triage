@@ -25,7 +25,6 @@
       "Bash(cloudformation *)",
       "Bash(kubectl *)",
       "Bash(rm *)",
-      "Bash(git push*)",
       "Bash(git reset*)",
       "Bash(git clean*)"
     ]
